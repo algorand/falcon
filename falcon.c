@@ -298,7 +298,7 @@ falcon_make_public(
 
 /* see falcon.h */
 int
-falcon_get_logn(void *obj, size_t len)
+falcon_get_logn(const void *obj, size_t len)
 {
 	int logn;
 

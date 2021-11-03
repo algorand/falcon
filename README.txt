@@ -1,7 +1,7 @@
-FALCON IMPLEMENTATION
-=====================
+DETERMINISTIC FALCON IMPLEMENTATION
+===================================
 
-Version: 2020-09-30
+Version: 2021-11-02
 
 Falcon is a post-quantum signature algorithm, submitted to NIST's
 Post-Quantum Cryptography project:
@@ -15,12 +15,43 @@ compact signatures and public keys. The official Falcon Web site is:
 
    https://falcon-sign.info/
 
+This implementation slightly extends the official Falcon code to
+support a fully deterministic (or "derandomized") signing mode; the
+interface is given in deterministic.h. (This is an alternative to the
+randomized-hashing mode enabled by the original implementation.) For
+the motivation for, and specification of, the deterministic mode, see
+**LINK**.
 
-This implementation is written in C and is configurable at compile-time
-through macros which are documented in config.h; each macro is a boolean
-option and can be enabled or disabled in config.h and/or as a
-command-line parameter to the compiler. Several implementation strategies
-are available; however, in all cases, the same API is implemented.
+This implementation is written in C and is configurable at compile
+time through macros which are documented in config.h; each macro is a
+boolean option and can be enabled or disabled in config.h and/or as a
+command-line parameter to the compiler. Several implementation
+strategies are available; however, in all cases, the same API is
+implemented.
+
+*** CRITICAL SECURITY WARNING ***
+
+For robust determinism across supported devices, which is needed to
+prevent a potential catastrophic security failure in the deterministic
+mode, it is STRONGLY RECOMMENDED that the following macro settings be
+used, as is done in config.h (see that file for further details):
+
+  - floating-point emulation (FALCON_FPEMU) should be enabled, in lieu
+    of native FP operations.
+
+  - "fused multiply-add" (FALCON_FMA) should be disabled, *especially*
+    if native FP operations are enabled.
+
+  - other optimizations like FALCON_AVX2 and FALCON_ASM_CORTEXM4
+    should be disabled as a cautionary measure, unless they are needed
+    for performance and can be thoroughly checked to not affect
+    determinism on the relevant signing devices.
+
+(According to the documentation below, FALCOM_FMA and FALCON_AVX2 have
+no effect when FALCON_FPEMU is enabled, but in config.h they are
+explicitly disabled as a defensive measure.)
+
+*** END CRITICAL SECURITY WARNING ***
 
 Main options are the following:
 
@@ -115,6 +146,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ===========================(LICENSE END)=============================
 
-The code was written by Thomas Pornin <thomas.pornin@nccgroup.com>, to
+The main code was written by Thomas Pornin <thomas.pornin@nccgroup.com>, to
 whom questions may be addressed. I'll endeavour to respond more or less
 promptly.
+
+The deterministic mode was written by David Lazar
+<lazard@csail.mit.edu>, with input from Chris Peikert
+<chris.peikert@algorand.com> and others from Algorand, Inc.

@@ -51,12 +51,15 @@ LIBS = #-lm
 
 # =====================================================================
 
-OBJ = codec.o common.o falcon.o fft.o fpr.o keygen.o rng.o shake.o sign.o vrfy.o
+OBJ = codec.o common.o deterministic.o falcon.o fft.o fpr.o keygen.o rng.o shake.o sign.o vrfy.o
 
-all: test_falcon speed
+all: test_deterministic test_falcon speed
 
 clean:
-	-rm -f $(OBJ) test_falcon test_falcon.o speed speed.o
+	-rm -f $(OBJ) test_deterministic test_deterministic.o test_falcon test_falcon.o speed speed.o
+
+test_deterministic: test_deterministic.o $(OBJ)
+	$(LD) $(LDFLAGS) -o test_deterministic test_deterministic.o $(OBJ) $(LIBS)
 
 test_falcon: test_falcon.o $(OBJ)
 	$(LD) $(LDFLAGS) -o test_falcon test_falcon.o $(OBJ) $(LIBS)
@@ -69,6 +72,9 @@ codec.o: codec.c config.h inner.h fpr.h
 
 common.o: common.c config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o common.o common.c
+
+deterministic.o: deterministic.c deterministic.h falcon.h
+	$(CC) $(CFLAGS) -c -o deterministic.o deterministic.c
 
 falcon.o: falcon.c falcon.h config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o falcon.o falcon.c
@@ -96,6 +102,9 @@ speed.o: speed.c falcon.h
 
 test_falcon.o: test_falcon.c falcon.h config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o test_falcon.o test_falcon.c
+
+test_deterministic.o: test_deterministic.c deterministic.h falcon.h config.h inner.h fpr.h
+	$(CC) $(CFLAGS) -c -o test_deterministic.o test_deterministic.c
 
 vrfy.o: vrfy.c config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o vrfy.o vrfy.c

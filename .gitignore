@@ -1,0 +1,4 @@
+**/*.o
+test_deterministic
+test_falcon
+speed
