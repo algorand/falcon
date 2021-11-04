@@ -20,7 +20,7 @@ support a fully deterministic (or "derandomized") signing mode; the
 interface is given in deterministic.h. (This is an alternative to the
 randomized-hashing mode enabled by the original implementation.) For
 the motivation for, and specification of, the deterministic mode, see
-**LINK**.
+falcon-det.pdf (in this repository).
 
 This implementation is written in C and is configurable at compile
 time through macros which are documented in config.h; each macro is a
