@@ -349,7 +349,7 @@ test_speed_falcon(unsigned logn, double threshold)
 }
 
 int
-main(int argc, char *argv[])
+test_speed(int argc, char *argv[])
 {
 	double threshold;
 
@@ -380,3 +380,7 @@ main(int argc, char *argv[])
 	test_speed_falcon(10, threshold);
 	return 0;
 }
+
+// int main(int argc, char *argv[]){
+// 	return test_speed(argc, argv);
+// }

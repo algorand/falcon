@@ -41,6 +41,15 @@ extern uint8_t falcon_det1024_nonce[40];
  */
 int falcon_det1024_keygen(shake256_context *rng, void *privkey, void *pubkey);
 
+
+/*
+ * Generate a keypair (for Falcon parameter n=1024) using a random seed.
+ *
+ * Returned value: 0 on success, or a negative error code.
+ */
+int falcon_det1024_keygen_with_seed(void *privkey, void *pubkey, const void * seed, size_t seed_size);
+
+
 /*
  * Deterministically sign the data provided in buffer data[] (of
  * length data_len bytes), using the private key held in privkey[] (of

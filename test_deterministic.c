@@ -9,6 +9,8 @@
 // enable in order to generate KATs (pipe output to test_deterministic_kat.h)
 // #define GENERATE_KATS 1
 
+#define NUM_OF_ITERATIONS 256
+
 // Copied from test_falcon.c
 static size_t
 hextobin(uint8_t *buf, size_t max_len, const char *src)
@@ -62,7 +64,7 @@ void test_inner(size_t data_len) {
 	uint8_t privkey[FALCON_DET1024_PRIVKEY_SIZE];
 	uint8_t sig[FALCON_DET1024_SIG_SIZE];
 	uint8_t expected_sig[FALCON_DET1024_SIG_SIZE];
-	uint8_t data[data_len];
+	uint8_t data[NUM_OF_ITERATIONS];
 
 	memset(privkey, 0, FALCON_DET1024_PRIVKEY_SIZE);
 	memset(pubkey, 0, FALCON_DET1024_PUBKEY_SIZE);
@@ -105,12 +107,12 @@ void test_inner(size_t data_len) {
 #endif
 }
 
-int main() {
+int test_deterministic() {
 #ifdef GENERATE_KATS
 	printf("\nstatic const char *const FALCON_DET1024_KAT[] = {\n");
 #endif
 
-	for (int i = 0; i < 512; i++) {
+	for (int i = 0; i < NUM_OF_ITERATIONS; i++) {
 		test_inner(i);
 #ifndef GENERATE_KATS
 		printf(".");
@@ -123,4 +125,9 @@ int main() {
 #else
 	printf("\nAll known-answer tests (KATs) pass.\n");
 #endif
+	return 0;
 }
+
+// int main (void){
+// 	return test_deterministic();
+// }

@@ -4,14 +4,26 @@
 #include "falcon.h"
 #include "deterministic.h"
 
+
+#define FALCON_TMPSIZE_KEYGEN_DET1024 FALCON_TMPSIZE_KEYGEN(FALCON_DET1024_LOGN)
+#define FALCON_TMPSIZE_SIGNDYN_DET1024 FALCON_TMPSIZE_SIGNDYN(FALCON_DET1024_LOGN)
+#define FALCON_SIG_PADDED_SIZE_DET1024 FALCON_SIG_PADDED_SIZE(FALCON_DET1024_LOGN)
+#define FALCON_TMPSIZE_VERIFY_DET1024 FALCON_TMPSIZE_VERIFY(FALCON_DET1024_LOGN)
+
+
+int falcon_det1024_keygen_with_seed(void *privkey, void *pubkey, const void * seed, size_t seed_size) {
+	shake256_context rng;
+	shake256_init_prng_from_seed(&rng, seed, seed_size);
+	return falcon_det1024_keygen(&rng, privkey, pubkey);
+}
+
 int falcon_det1024_keygen(shake256_context *rng, void *privkey, void *pubkey) {
-	size_t tmpkg_len = FALCON_TMPSIZE_KEYGEN(FALCON_DET1024_LOGN);
-	uint8_t tmpkg[tmpkg_len];
+	uint8_t tmpkg[FALCON_TMPSIZE_KEYGEN_DET1024];
 
 	return falcon_keygen_make(rng, FALCON_DET1024_LOGN,
 		privkey, FALCON_DET1024_PRIVKEY_SIZE,
 		pubkey, FALCON_DET1024_PUBKEY_SIZE,
-		tmpkg, tmpkg_len);
+		tmpkg, FALCON_TMPSIZE_KEYGEN_DET1024);
 }
 
 uint8_t falcon_det1024_nonce[40] = {"FALCON_DET1024"};
@@ -19,12 +31,12 @@ uint8_t falcon_det1024_nonce[40] = {"FALCON_DET1024"};
 int falcon_det1024_sign(void *sig, const void *privkey, const void *data, size_t data_len) {
 	shake256_context detrng;
 	shake256_context hd;
-	size_t tmpsd_len = FALCON_TMPSIZE_SIGNDYN(FALCON_DET1024_LOGN);
-	uint8_t tmpsd[tmpsd_len];
+
+	uint8_t tmpsd[FALCON_TMPSIZE_SIGNDYN_DET1024];
 	uint8_t domain[1], logn[1];
 
-	size_t siglen = FALCON_SIG_PADDED_SIZE(FALCON_DET1024_LOGN);
-	uint8_t fullsig[siglen];
+	size_t siglen = FALCON_SIG_PADDED_SIZE_DET1024;
+	uint8_t fullsig[FALCON_SIG_PADDED_SIZE_DET1024];
 
 	if (falcon_get_logn(privkey, FALCON_DET1024_PRIVKEY_SIZE) != FALCON_DET1024_LOGN) {
 		return FALCON_ERR_FORMAT;
@@ -47,7 +59,7 @@ int falcon_det1024_sign(void *sig, const void *privkey, const void *data, size_t
 
 	int r = falcon_sign_dyn_finish(&detrng, fullsig, &siglen,
 		FALCON_SIG_PADDED, privkey, FALCON_DET1024_PRIVKEY_SIZE,
-		&hd, falcon_det1024_nonce, tmpsd, tmpsd_len);
+		&hd, falcon_det1024_nonce, tmpsd, FALCON_TMPSIZE_SIGNDYN_DET1024);
 	if (r != 0) {
 		return r;
 	}
@@ -61,11 +73,10 @@ int falcon_det1024_sign(void *sig, const void *privkey, const void *data, size_t
 }
 
 int falcon_det1024_verify(const void *sig, const void *pubkey, const void *data, size_t data_len) {
-	size_t tmpvv_len = FALCON_TMPSIZE_VERIFY(FALCON_DET1024_LOGN);
-	uint8_t tmpvv[tmpvv_len];
+	uint8_t tmpvv[FALCON_TMPSIZE_VERIFY_DET1024];
 
-	size_t siglen = FALCON_SIG_PADDED_SIZE(FALCON_DET1024_LOGN);
-	uint8_t fullsig[siglen];
+	size_t siglen = FALCON_SIG_PADDED_SIZE_DET1024;
+	uint8_t fullsig[FALCON_SIG_PADDED_SIZE_DET1024];
 
 	const uint8_t *sigbytes = sig;
 	// det1024 signatures must start with the prefix byte:
@@ -83,5 +94,5 @@ int falcon_det1024_verify(const void *sig, const void *pubkey, const void *data,
 
 	return falcon_verify(fullsig, siglen, FALCON_SIG_PADDED,
 		pubkey, FALCON_DET1024_PUBKEY_SIZE, data, data_len,
-		tmpvv, tmpvv_len);
+		tmpvv, FALCON_TMPSIZE_VERIFY_DET1024);
 }

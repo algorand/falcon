@@ -5004,7 +5004,7 @@ test_speed(void)
 #endif
 
 int
-main(void)
+test_falcon(void)
 {
 	unsigned old;
 
@@ -5028,3 +5028,7 @@ main(void)
 	set_fpu_cw(old);
 	return 0;
 }
+
+// int main (void){
+// 	return test_falcon();
+// }
