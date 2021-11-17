@@ -9,7 +9,7 @@
 // enable in order to generate KATs (pipe output to test_deterministic_kat.h)
 // #define GENERATE_KATS 1
 
-#define NUM_OF_ITERATIONS 256
+#define NUM_KATS 256
 
 // Copied from test_falcon.c
 static size_t
@@ -64,7 +64,7 @@ void test_inner(size_t data_len) {
 	uint8_t privkey[FALCON_DET1024_PRIVKEY_SIZE];
 	uint8_t sig[FALCON_DET1024_SIG_SIZE];
 	uint8_t expected_sig[FALCON_DET1024_SIG_SIZE];
-	uint8_t data[NUM_OF_ITERATIONS];
+	uint8_t data[NUM_KATS];
 
 	memset(privkey, 0, FALCON_DET1024_PRIVKEY_SIZE);
 	memset(pubkey, 0, FALCON_DET1024_PUBKEY_SIZE);
@@ -112,7 +112,7 @@ int test_deterministic() {
 	printf("\nstatic const char *const FALCON_DET1024_KAT[] = {\n");
 #endif
 
-	for (int i = 0; i < NUM_OF_ITERATIONS; i++) {
+	for (int i = 0; i < NUM_KATS; i++) {
 		test_inner(i);
 #ifndef GENERATE_KATS
 		printf(".");
