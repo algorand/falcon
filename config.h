@@ -45,7 +45,50 @@
  */
 
 /*
- * Use the native 'double' C type for floating-point computations. Exact
+ * Emulated floating-point implementation.
+ *
+ * Emulation uses only integer operations with uint32_t and uint64_t
+ * types. This is constant-time, provided that the underlying platform
+ * offers constant-time opcodes for the following operations:
+ *
+ *  - Multiplication of two 32-bit unsigned integers into a 64-bit result.
+ *  - Left-shift or right-shift of a 32-bit unsigned integer by a
+ *    potentially secret shift count in the 0..31 range.
+ *
+ * Notably, the ARM Cortex M3 does not fulfill the first condition,
+ * while the Pentium IV does not fulfill the second.
+ *
+ */
+
+/*
+ * *** CRITICAL SECURITY WARNING ***:
+ *
+ * Here floating-point emulation is enabled in order to get reliable
+ * deterministic signing, because native floating-point units and code
+ * optimizations may yield slight discrepancies that could affect
+ * determinism.
+ *
+ * KEEPING FALCON_FPEMU ENABLED IS STRONGLY RECOMMENDED! Emulation may
+ * be needed for obtaining truly deterministic signing across
+ * different platforms and configurations, i.e., the same message
+ * should always yield the same signature (under the same secret key).
+ *
+ * Any non-determinism in signing can lead to a CATASTROPHIC SECURITY
+ * FAILURE, potentially enabling an attacker to create forgeries for
+ * arbitrary messages after obtaining two or more different signatures
+ * for the same message (under the same secret key).
+ *
+ * Determinism can be sanity-checked (but not guaranteed) using the
+ * provided KATs, via test_deterministic. Any deviation from the
+ * expected results indicates a lack of the desired determinism;
+ * however, agreement does not prove determinism for all possible
+ * inputs.
+ */
+#define FALCON_FPEMU  1
+
+
+/*
+ * Native 'double' C type for floating-point computations. Exact
  * reproducibility of all tests requires that type to faithfully follow
  * IEEE-754 "round-to-nearest" rules.
  *
@@ -63,37 +106,22 @@
  * FALCON_ASM_CORTEXM4 is defined to 1, in which case the emulated code
  * will be used.
  *
-#define FALCON_FPNATIVE   1
  */
 
 /*
- * Use emulated floating-point implementation.
- *
- * Emulation uses only integer operations with uint32_t and uint64_t
- * types. This is constant-time, provided that the underlying platform
- * offers constant-time opcodes for the following operations:
- *
- *  - Multiplication of two 32-bit unsigned integers into a 64-bit result.
- *  - Left-shift or right-shift of a 32-bit unsigned integer by a
- *    potentially secret shift count in the 0..31 range.
- *
- * Notably, the ARM Cortex M3 does not fulfill the first condition,
- * while the Pentium IV does not fulfill the second.
- *
- * If neither FALCON_FPNATIVE nor FALCON_FPEMU is defined, then use of
- * the native 'double' C type is the default behaviour unless
- * FALCON_ASM_CORTEXM4 is defined to 1, in which case the emulated code
- * will be used.
- *
-#define FALCON_FPEMU   1
+ * For determinism, explicitly disable native floating-point
+ * operations. (These are already implicitly disabled by enabling
+ * FALCON_FPEMU above; here it is made explicit as a defensive
+ * measure.)
  */
+#define FALCON_FPNATIVE  0
+
 
 /*
- * Enable use of assembly for ARM Cortex-M4 CPU. By default, such
- * support will be used based on some autodection on the compiler
- * version and target architecture. Define this variable to 1 to force
- * use of the assembly code, or 0 to disable it regardless of the
- * autodetection.
+ * Assembly for ARM Cortex-M4 CPU: by default, such support will be
+ * used based on some autodection on the compiler version and target
+ * architecture. Define this variable to 1 to force use of the
+ * assembly code, or 0 to disable it regardless of the autodetection.
  *
  * When FALCON_ASM_CORTEXM4 is enabled (whether defined explicitly or
  * autodetected), emulated floating-point code will be used, unless
@@ -108,31 +136,64 @@
  * opcode (multiplication of two 32-bit unsigned integers with a 64-bit
  * result) is NOT constant-time.
  *
-#define FALCON_ASM_CORTEXM4   1
  */
 
 /*
- * Enable use of AVX2 intrinsics. If enabled, then the code will compile
- * only when targeting x86 with a compiler that supports AVX2 intrinsics
- * (tested with GCC 7.4.0, Clang 6.0.0, and MSVC 2015, both in 32-bit
- * and 64-bit modes), and run only on systems that offer the AVX2
+ * Explicitly disable the specialized assembly code for ARM Cortex-M4.
+ *
+ * While we are not aware of any way that the assembly code could lead
+ * to non-determinism, caution should be exercised if it is ever under
+ * consideration for usage. (At minimum, check KATs.)
+ */
+#define FALCON_ASM_CORTEXM4  0
+
+
+/*
+ * AVX2 intrinsics: if enabled, then the code will compile only when
+ * targeting x86 with a compiler that supports AVX2 intrinsics (tested
+ * with GCC 7.4.0, Clang 6.0.0, and MSVC 2015, both in 32-bit and
+ * 64-bit modes), and run only on systems that offer the AVX2
  * opcodes. Some operations leverage AVX2 for better performance.
  *
-#define FALCON_AVX2   1
  */
 
 /*
- * Enable use of FMA intrinsics. This setting has any effect only if
- * FALCON_AVX2 is also enabled. The FMA intrinsics are normally available
- * on any x86 CPU that also has AVX2. Note that setting this option will
- * slightly modify the values of expanded private keys, but will normally
- * not change the values of non-expanded private keys, public keys or
- * signatures, for a given keygen/sign seed (non-expanded private keys
- * and signatures might theoretically change, but only with low probability,
- * less than 2^(-40); produced signatures are still safe and interoperable).
+ * Explicitly disable AVX2 optimizations. (These are already
+ * implicitly disabled by enabling FALCON_FPEMU above; here it is made
+ * explicit as a defensive measure.)
  *
-#define FALCON_FMA   1
+ * While we are not aware of any way that AVX2 optimizations could
+ * lead to non-determinism, caution should be exercised if they are
+ * ever under consideration for usage. (At minimum, check KATs.)
  */
+#define FALCON_AVX2  0
+
+
+/*
+ * FMA intrinsics: this setting has any effect only if FALCON_AVX2 is
+ * also enabled. The FMA intrinsics are normally available on any x86
+ * CPU that also has AVX2. Note that setting this option will slightly
+ * modify the values of expanded private keys, but will normally not
+ * change the values of non-expanded private keys, public keys or
+ * signatures, for a given keygen/sign seed (non-expanded private keys
+ * and signatures might theoretically change, but only with low
+ * probability, less than 2^(-40); produced signatures are still safe
+ * and interoperable).
+ *
+ */
+
+/*
+ * Explicitly disable FMA intrinsics, which (as mentioned above) are
+ * KNOWN to lead to non-determinism in some cases. (These are already
+ * implicitly disabled by enabling FALCON_FPEMU above; here it is made
+ * explicit as a defensive measure.)
+ *
+ * CRITICAL SECURITY WARNING: it is strongly recommended *NOT* to
+ * enable both FALCON_FPU and FALCON_FMA. Doing so is *KNOWN* to lead
+ * to non-determinism in some cases.
+ */
+#define FALCON_FMA  0
+
 
 /*
  * Assert that the platform uses little-endian encoding. If enabled,

@@ -35,8 +35,8 @@
 #include <time.h>
 #include <math.h>
 
-#include "inner.h"
-#include "falcon.h"
+#include "../inner.h"
+#include "../falcon.h"
 
 /*
  * If using ChaCha20 during keygen, then we don't generate the same

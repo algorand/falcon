@@ -38,7 +38,7 @@
  * This code uses only the external API.
  */
 
-#include "falcon.h"
+#include "../falcon.h"
 
 static void *
 xmalloc(size_t len)

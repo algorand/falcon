@@ -527,7 +527,7 @@ int falcon_make_public(
  * signature. Returned value is the logarithm of the degree (1 to 10),
  * or a negative error code.
  */
-int falcon_get_logn(void *obj, size_t len);
+int falcon_get_logn(const void *obj, size_t len);
 
 /* ==================================================================== */
 /*
