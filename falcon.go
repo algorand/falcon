@@ -113,6 +113,7 @@ func (sig CTSignature) Verify(publicKey PublicKey, msg []byte) bool {
 }
 
 // SaltVersion returns the salt version number used in the signature.
+// The default salt version is 0, if the signature is too short.
 func (sig CompressedSignature) SaltVersion() int {
 	if len(sig) < 2 {
 		return 0
@@ -121,6 +122,7 @@ func (sig CompressedSignature) SaltVersion() int {
 }
 
 // SaltVersion returns the salt version number used in the signature.
+// The default salt version is 0, if the signature is too short.
 func (sig CTSignature) SaltVersion() int {
 	if len(sig) < 2 {
 		return 0
