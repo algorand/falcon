@@ -27,9 +27,16 @@ import "C"
 
 import (
 	"fmt"
+	"runtime"
 	"unsafe"
 )
 
+const (
+	errKeygenFail = "falcon keygen failed error is: %d"
+	errSignFail   = "falcon sign failed error is: %d"
+	errVerifyFail = "falcon verify failed error is: %d"
+	errConvertFail = "falcon convert to CT failed error is: %d"
+)
 const (
 	// PublicKeySize is the size of a Falcon public key.
 	PublicKeySize = C.FALCON_DET1024_PUBKEY_SIZE
@@ -38,10 +45,14 @@ const (
 	// CurrentSaltVersion is the salt version number used to compute signatures.
 	// The salt version is incremented when the signing procedure changes (rarely).
 	CurrentSaltVersion = C.FALCON_DET1024_CURRENT_SALT_VERSION
+	// CTSignatureSize is the max size in bytes of a Falcon signature in CT format
+	CTSignatureSize = C.FALCON_DET1024_SIG_CT_SIZE
+	// SignatureMaxSize is the max possible size in bytes of a Falcon signature in a compressed format.
+	SignatureMaxSize = C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE
 )
 
-type PublicKey []byte
-type PrivateKey []byte
+type PublicKey [PublicKeySize]byte
+type PrivateKey [PrivateKeySize]byte
 
 // CompressedSignature is a deterministic Falcon signature in compressed
 // form, which is variable-length.
@@ -49,69 +60,87 @@ type CompressedSignature []byte
 
 // CTSignature is a deterministic Falcon signature in constant-time form,
 // which is fixed-length.
-type CTSignature []byte
+type CTSignature [CTSignatureSize]byte
 
 // GenerateKey generates a public/private key pair from the given seed.
 func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 	var rng C.shake256_context
 	C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(&seed[0]), C.size_t(len(seed)))
 
-	publicKey := make([]byte, PublicKeySize)
-	privateKey := make([]byte, PrivateKeySize)
+	publicKey := PublicKey{}
+	privateKey := PrivateKey{}
 
 	r := C.falcon_det1024_keygen(&rng, unsafe.Pointer(&privateKey[0]), unsafe.Pointer(&publicKey[0]))
 	if r != 0 {
-		return nil, nil, fmt.Errorf("falcon keygen failed: %d", int(r))
+		return PublicKey{}, PrivateKey{}, fmt.Errorf(errKeygenFail, int(r))
 	}
 
+	runtime.KeepAlive(seed)
 	return publicKey, privateKey, nil
 }
 
 // SignCompressed signs the message with privateKey and returns a compressed
 // signature, or an error if signing fails (e.g., due to a malformed private key).
-func SignCompressed(privateKey PrivateKey, msg []byte) (CompressedSignature, error) {
-	data := C.NULL
-	if len(msg) > 0 {
-		data = unsafe.Pointer(&msg[0])
+func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
+	msgLen := len(msg)
+
+	cdata := (*C.uchar)(C.NULL)
+	if msgLen > 0 {
+		cdata = (*C.uchar)(&msg[0])
 	}
+
 	var sigLen C.size_t
-	sig := make([]byte, C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE)
-	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&privateKey[0]), data, C.size_t(len(msg)))
+	var sig [SignatureMaxSize]byte
+	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(cdata), C.size_t(msgLen))
 	if r != 0 {
-		return nil, fmt.Errorf("falcon sign failed: %d", int(r))
+		return nil, fmt.Errorf(errSignFail, int(r))
 	}
-	sig = sig[:sigLen]
-	return sig, nil
+
+	runtime.KeepAlive(msg)
+	return sig[:sigLen], nil
 }
 
 // ConvertToCT converts a compressed signature to a CT signature.
-func (sig CompressedSignature) ConvertToCT() (CTSignature, error) {
-	sigCT := make([]byte, C.FALCON_DET1024_SIG_CT_SIZE)
-	r := C.falcon_det1024_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), unsafe.Pointer(&sig[0]), C.size_t(len(sig)))
+func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
+	sigCT := CTSignature{}
+
+	r := C.falcon_det1024_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), unsafe.Pointer(&(*sig)[0]), C.size_t(len(*sig)))
 	if r != 0 {
-		return nil, fmt.Errorf("falcon convert failed: %d", int(r))
+		return CTSignature{}, fmt.Errorf(errConvertFail, int(r))
 	}
 	return sigCT, nil
 }
 
 // Verify reports whether sig is a valid compressed signature of msg under publicKey.
-func (sig CompressedSignature) Verify(publicKey PublicKey, msg []byte) bool {
+func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
+	msgLen := len(msg)
 	data := C.NULL
-	if len(msg) > 0 {
+	if msgLen > 0 {
 		data = unsafe.Pointer(&msg[0])
 	}
-	r := C.falcon_det1024_verify_compressed(unsafe.Pointer(&sig[0]), C.size_t(len(sig)), unsafe.Pointer(&publicKey[0]), data, C.size_t(len(msg)))
-	return r == 0
+
+	r := C.falcon_det1024_verify_compressed(unsafe.Pointer(&signature[0]), C.size_t(len(signature)), unsafe.Pointer(&(*pk)), data, C.size_t(msgLen))
+	if r != 0 {
+		return  fmt.Errorf(errVerifyFail, int(r))
+	}
+
+	runtime.KeepAlive(msg)
+	return nil
 }
 
-// Verify reports whether sig is a valid CT signature of msg under publicKey.
-func (sig CTSignature) Verify(publicKey PublicKey, msg []byte) bool {
+// VerifyCTSignature reports whether sig is a valid CT signature of msg under publicKey.
+func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error {
 	data := C.NULL
 	if len(msg) > 0 {
 		data = unsafe.Pointer(&msg[0])
 	}
-	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&sig[0]), unsafe.Pointer(&publicKey[0]), data, C.size_t(len(msg)))
-	return r == 0
+	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]),  unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
+	if r != 0 {
+		return  fmt.Errorf(errVerifyFail, int(r))
+	}
+
+	runtime.KeepAlive(msg)
+	return nil
 }
 
 // SaltVersion returns the salt version number used in the signature.

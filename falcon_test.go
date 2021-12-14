@@ -59,7 +59,7 @@ func testKAT(t *testing.T, msgLen int) {
 	}
 	_ = pub
 
-	sig, err := SignCompressed(priv, msg)
+	sig, err := priv.SignCompressed(msg)
 	if err != nil {
 		panic(err)
 	}
@@ -89,13 +89,13 @@ func TestFalcon(t *testing.T) {
 		msg := make([]byte, 500)
 		rand.Read(msg)
 
-		sig, err := SignCompressed(priv, msg)
+		sig, err := priv.SignCompressed(msg)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		ok := sig.Verify(pub, msg)
-		if !ok {
+		err = pub.Verify(sig, msg)
+		if err != nil{
 			t.Fatalf("verify failed")
 		}
 
@@ -109,17 +109,17 @@ func TestFalcon(t *testing.T) {
 		// Flip a random bit in the message.
 		badmsg[mathrand.Intn(len(msg))] ^= 1 << mathrand.Intn(8)
 
-		ok = sig.Verify(pub, badmsg)
-		if ok {
+		err = pub.Verify(sig, badmsg)
+		if err == nil{
 			t.Fatalf("expected verify to fail on modified message")
 		}
 
-		badpub := make([]byte, len(pub))
-		copy(badpub, pub)
+		badpub := PublicKey{}
+		copy(badpub[:], pub[:])
 		badpub[mathrand.Intn(len(pub))] ^= 1 << mathrand.Intn(8)
 
-		ok = sig.Verify(badpub, msg)
-		if ok {
+		err = badpub.Verify(sig, msg)
+		if err == nil{
 			t.Fatalf("expected verify to fail with modified public key")
 		}
 
@@ -128,8 +128,8 @@ func TestFalcon(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ok = sigCT.Verify(pub, msg)
-		if !ok {
+		err = pub.VerifyCTSignature(sigCT, msg)
+		if err != nil{
 			t.Fatalf("verify_ct failed")
 		}
 	}
