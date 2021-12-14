@@ -18,7 +18,9 @@
 // signature scheme.
 package falcon
 
-// #cgo CFLAGS: -O3
+// NOTE: cgo go code couldn't compile with the flags: -Wmissing-prototypes and -Wno-unused-paramete
+
+//#cgo CFLAGS:  -Wall -Wextra -Wpedantic -Wredundant-decls -Wshadow -Wvla -Wpointer-arith -Wno-unused-parameter -Wno-overlength-strings  -O3 -fomit-frame-pointer
 // #include "falcon.h"
 // #include "deterministic.h"
 import "C"
