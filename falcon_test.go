@@ -53,15 +53,14 @@ func testKAT(t *testing.T, msgLen int) {
 	msgrng.Read(msg)
 
 	keySeed := fmt.Sprintf("key-%04d", msgLen)
-	pub, priv, err := GenerateKey([]byte(keySeed))
+	_, priv, err := GenerateKey([]byte(keySeed))
 	if err != nil {
-		panic(err)
+		t.Fatalf("failed to generate keys. err message: %s", err)
 	}
-	_ = pub
 
 	sig, err := priv.SignCompressed(msg)
 	if err != nil {
-		panic(err)
+		t.Fatalf("failed to sign keys. err message: %s", err)
 	}
 
 	if s := hex.EncodeToString(sig); s != kats[msgLen] {
@@ -83,7 +82,7 @@ func TestFalcon(t *testing.T) {
 
 		pub, priv, err := GenerateKey(seed)
 		if err != nil {
-			panic(err)
+			t.Fatalf("failed to generate keys. err message: %s", err)
 		}
 
 		msg := make([]byte, 500)
@@ -91,12 +90,12 @@ func TestFalcon(t *testing.T) {
 
 		sig, err := priv.SignCompressed(msg)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("failed to sign message. err message: %s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
 		}
 
 		err = pub.Verify(sig, msg)
-		if err != nil{
-			t.Fatalf("verify failed")
+		if err != nil {
+			t.Fatalf("failed to verify message. err message: %s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
 		}
 
 		v := sig.SaltVersion()
@@ -110,8 +109,8 @@ func TestFalcon(t *testing.T) {
 		badmsg[mathrand.Intn(len(msg))] ^= 1 << mathrand.Intn(8)
 
 		err = pub.Verify(sig, badmsg)
-		if err == nil{
-			t.Fatalf("expected verify to fail on modified message")
+		if err == nil {
+			t.Fatalf("expected verify to fail on modified message. err:%s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
 		}
 
 		badpub := PublicKey{}
@@ -119,18 +118,201 @@ func TestFalcon(t *testing.T) {
 		badpub[mathrand.Intn(len(pub))] ^= 1 << mathrand.Intn(8)
 
 		err = badpub.Verify(sig, msg)
-		if err == nil{
-			t.Fatalf("expected verify to fail with modified public key")
+		if err == nil {
+			t.Fatalf("expected verify to fail with modified public key. err: %s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
 		}
 
 		sigCT, err := sig.ConvertToCT()
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("failed to conver sign to CT. err: %s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
 		}
 
 		err = pub.VerifyCTSignature(sigCT, msg)
-		if err != nil{
-			t.Fatalf("verify_ct failed")
+		if err != nil {
+			t.Fatalf("verify_ct failed err msg %s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
 		}
+	}
+}
+
+func TestFalconCompressedSignatureSizes(t *testing.T) {
+	seed := make([]byte, 64)
+	rand.Read(seed)
+
+	pub, priv, err := GenerateKey(seed)
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+
+	msg := make([]byte, 500)
+	rand.Read(msg)
+
+	sig, err := priv.SignCompressed(msg)
+	if err != nil {
+		t.Fatalf("failed to sign message. err message: %s", err)
+	}
+
+	var sig2 [SignatureMaxSize+1]byte
+	copy(sig2[:], sig)
+	err = pub.Verify(sig2[:], msg)
+	if err == nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+
+	var sig3 [1]byte
+	copy(sig3[:], sig)
+	err = pub.Verify(sig3[:], msg)
+	if err == nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+
+}
+
+func TestFalconSignNilMessage(t *testing.T) {
+	seed := make([]byte, 64)
+	rand.Read(seed)
+
+	pub, priv, err := GenerateKey(seed)
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+
+	sig, err := priv.SignCompressed(nil)
+	if err != nil {
+		t.Fatalf("failed to sign message. err message: %s", err)
+	}
+
+	err = pub.Verify(sig, nil)
+	if err != nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+
+	err = pub.Verify(sig, []byte{})
+	if err != nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+
+	ctSignature, err := sig.ConvertToCT()
+	if err != nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+
+	err = pub.VerifyCTSignature(ctSignature, nil)
+	if err != nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+
+	err = pub.VerifyCTSignature(ctSignature, []byte{})
+	if err != nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+}
+
+func TestFalconGenerateKeysDifferentSeed(t *testing.T) {
+	seed := make([]byte, 64)
+	rand.Read(seed)
+
+	pub, sk, err := GenerateKey(seed)
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+
+	rand.Read(seed)
+	pub2, sk2, err := GenerateKey(seed)
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+
+	if pub == pub2 {
+		t.Fatalf("public keys are the same")
+	}
+
+	if sk == sk2 {
+		t.Fatalf("private keys are the same")
+	}
+}
+
+func TestFalconNilSignature(t *testing.T) {
+	seed := make([]byte, 64)
+	rand.Read(seed)
+
+	pub, _, err := GenerateKey(seed)
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+
+	msg := make([]byte, 500)
+	rand.Read(msg)
+
+	err = pub.Verify(nil, msg)
+	if err == nil {
+		t.Fatalf("verification succeeded. should have failed.")
+	}
+
+	err = pub.Verify([]byte{}, msg)
+	if err == nil {
+		t.Fatalf("verification succeeded. should have failed.")
+	}
+}
+
+func TestFalconNilSeed(t *testing.T) {
+	_, _, err := GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+
+	_, _, err = GenerateKey([]byte{})
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+}
+
+func BenchmarkFalconKeyGen(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		var seed [48]byte
+		rand.Read(seed[:])
+		GenerateKey(seed[:])
+	}
+}
+
+func BenchmarkFalconSignCompressed(b *testing.B) {
+	_, sk, err := GenerateKey([]byte("seed"))
+	if err != nil {
+		b.Fatalf("GenerateKey failed")
+	}
+
+	strs := make([][64]byte, b.N)
+	for i := 0; i < b.N; i++ {
+		var msg [64]byte
+		rand.Read(msg[:])
+		strs[i] = msg
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sk.SignCompressed(strs[i][:])
+	}
+
+}
+
+func BenchmarkFalconVerify(b *testing.B) {
+	pk, sk, err := GenerateKey([]byte("seed"))
+	if err != nil {
+		b.Error(err, "GenerateKey failed")
+	}
+
+	strs := make([][64]byte, b.N)
+	sigs := make([]CompressedSignature, b.N)
+	fmt.Printf("%d\n", b.N)
+	for i := 0; i < b.N; i++ {
+
+		var msg [64]byte
+		rand.Read(msg[:])
+		strs[i] = msg
+		sigs[i], _ = sk.SignCompressed(msg[:])
+	}
+	fmt.Printf("start %d\n", b.N)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pk.Verify(sigs[i], strs[i][:])
 	}
 }

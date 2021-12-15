@@ -65,7 +65,13 @@ type CTSignature [CTSignatureSize]byte
 // GenerateKey generates a public/private key pair from the given seed.
 func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 	var rng C.shake256_context
-	C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(&seed[0]), C.size_t(len(seed)))
+
+	seedLen := len(seed)
+	seedData := (*C.uchar)(C.NULL)
+	if seedLen > 0 {
+		seedData = (*C.uchar)(&seed[0])
+	}
+	C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(seedData), C.size_t(seedLen))
 
 	publicKey := PublicKey{}
 	privateKey := PrivateKey{}
@@ -83,7 +89,6 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 // signature, or an error if signing fails (e.g., due to a malformed private key).
 func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 	msgLen := len(msg)
-
 	cdata := (*C.uchar)(C.NULL)
 	if msgLen > 0 {
 		cdata = (*C.uchar)(&msg[0])
@@ -114,17 +119,24 @@ func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 // Verify reports whether sig is a valid compressed signature of msg under publicKey.
 func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 	msgLen := len(msg)
-	data := C.NULL
+	msgData := C.NULL
 	if msgLen > 0 {
-		data = unsafe.Pointer(&msg[0])
+		msgData = unsafe.Pointer(&msg[0])
 	}
 
-	r := C.falcon_det1024_verify_compressed(unsafe.Pointer(&signature[0]), C.size_t(len(signature)), unsafe.Pointer(&(*pk)), data, C.size_t(msgLen))
+	sigLen := len(signature)
+	sigData := C.NULL
+	if sigLen > 0 {
+		sigData = unsafe.Pointer(&signature[0])
+	}
+
+	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), msgData, C.size_t(msgLen))
 	if r != 0 {
 		return  fmt.Errorf(errVerifyFail, int(r))
 	}
 
 	runtime.KeepAlive(msg)
+	runtime.KeepAlive(signature)
 	return nil
 }
 
