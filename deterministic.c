@@ -124,16 +124,21 @@ int falcon_det1024_verify_compressed(const void *sig, size_t sig_len,
 	uint8_t tmpvv[FALCON_TMPSIZE_VERIFY_DET1024];
 	uint8_t salted_sig[FALCON_SIG_COMPRESSED_MAXSIZE_DET1024];
 
-	// Add back the salt; drop the version byte.
-	size_t salted_sig_len = sig_len + 40 - 1;
-
-	if (salted_sig_len >= FALCON_SIG_COMPRESSED_MAXSIZE_DET1024){
-		return FALCON_ERR_SIZE;
+	if (sig_len < 41) {
+		return FALCON_ERR_BADSIG;
 	}
 
 	if (((uint8_t*)sig)[0] != FALCON_DET1024_SIG_COMPRESSED_HEADER) {
 		return FALCON_ERR_BADSIG;
 	}
+
+	// Add back the salt; drop the version byte.
+	size_t salted_sig_len = sig_len + 40 - 1;
+
+	if (salted_sig_len > FALCON_SIG_COMPRESSED_MAXSIZE_DET1024){
+		return FALCON_ERR_BADSIG;
+	}
+
 
 	falcon_det1024_resalt(salted_sig, sig, sig_len);
 
