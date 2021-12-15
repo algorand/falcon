@@ -124,7 +124,7 @@ int falcon_det1024_verify_compressed(const void *sig, size_t sig_len,
 	uint8_t tmpvv[FALCON_DET1024_TMPSIZE_VERIFY];
 	uint8_t salted_sig[FALCON_DET1024_SALTED_SIG_COMPRESSED_MAXSIZE];
 
-	if (sig_len < 41) {
+	if (sig_len < 2) {
 		return FALCON_ERR_BADSIG;
 	}
 

@@ -165,6 +165,13 @@ func TestFalconCompressedSignatureSizes(t *testing.T) {
 		t.Fatalf("failed to verify message. err message: %s", err)
 	}
 
+	var sig4 [2]byte
+	copy(sig4[:], sig)
+	err = pub.Verify(sig4[:], msg)
+	if err == nil {
+		t.Fatalf("failed to verify message. err message: %s", err)
+	}
+
 }
 
 func TestFalconSignNilMessage(t *testing.T) {
