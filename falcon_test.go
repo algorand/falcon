@@ -110,7 +110,7 @@ func TestFalcon(t *testing.T) {
 
 		err = pub.Verify(sig, badmsg)
 		if err == nil {
-			t.Fatalf("expected verify to fail on modified message. err:%s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
+			t.Fatalf("expected verify to fail on modified message. on pk: %v , sk: %v, msg: %v", pub, priv, msg)
 		}
 
 		badpub := PublicKey{}
@@ -119,7 +119,7 @@ func TestFalcon(t *testing.T) {
 
 		err = badpub.Verify(sig, msg)
 		if err == nil {
-			t.Fatalf("expected verify to fail with modified public key. err: %s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
+			t.Fatalf("expected verify to fail with modified public key. on pk: %v , sk: %v, msg: %v", pub, priv, msg)
 		}
 
 		sigCT, err := sig.ConvertToCT()
@@ -155,21 +155,21 @@ func TestFalconCompressedSignatureSizes(t *testing.T) {
 	copy(sig2[:], sig)
 	err = pub.Verify(sig2[:], msg)
 	if err == nil {
-		t.Fatalf("failed to verify message. err message: %s", err)
+		t.Fatalf("verification succeeded. should have failed.")
 	}
 
 	var sig3 [1]byte
 	copy(sig3[:], sig)
 	err = pub.Verify(sig3[:], msg)
 	if err == nil {
-		t.Fatalf("failed to verify message. err message: %s", err)
+		t.Fatalf("verification succeeded. should have failed.")
 	}
 
 	var sig4 [2]byte
 	copy(sig4[:], sig)
 	err = pub.Verify(sig4[:], msg)
 	if err == nil {
-		t.Fatalf("failed to verify message. err message: %s", err)
+		t.Fatalf("verification succeeded. should have failed.")
 	}
 
 }
@@ -298,7 +298,6 @@ func BenchmarkFalconSignCompressed(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		sk.SignCompressed(strs[i][:])
 	}
-
 }
 
 func BenchmarkFalconVerify(b *testing.B) {
@@ -309,15 +308,13 @@ func BenchmarkFalconVerify(b *testing.B) {
 
 	strs := make([][64]byte, b.N)
 	sigs := make([]CompressedSignature, b.N)
-	fmt.Printf("%d\n", b.N)
 	for i := 0; i < b.N; i++ {
-
 		var msg [64]byte
 		rand.Read(msg[:])
 		strs[i] = msg
 		sigs[i], _ = sk.SignCompressed(msg[:])
 	}
-	fmt.Printf("start %d\n", b.N)
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pk.Verify(sigs[i], strs[i][:])
