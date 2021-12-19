@@ -151,7 +151,7 @@ func TestFalconCompressedSignatureSizes(t *testing.T) {
 		t.Fatalf("failed to sign message. err message: %s", err)
 	}
 
-	var sig2 [SignatureMaxSize+1]byte
+	var sig2 [SignatureMaxSize + 1]byte
 	copy(sig2[:], sig)
 	err = pub.Verify(sig2[:], msg)
 	if err == nil {
@@ -270,6 +270,23 @@ func TestFalconNilSeed(t *testing.T) {
 	_, _, err = GenerateKey([]byte{})
 	if err != nil {
 		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+}
+
+func TestSaltedVersions(t *testing.T) {
+	emptyCTSig := CTSignature{}
+	if emptyCTSig.SaltVersion() != -1 {
+		t.Fatalf("exptected salt value to be error")
+	}
+
+	emptyCompressSig := CompressedSignature{}
+	if emptyCompressSig.SaltVersion() != -1 {
+		t.Fatalf("exptected salt value to be error")
+	}
+
+	emptyCompressSig = []byte{0x0}
+	if emptyCompressSig.SaltVersion() != -1 {
+		t.Fatalf("exptected salt value to be error")
 	}
 }
 

@@ -32,9 +32,9 @@ import (
 )
 
 const (
-	errKeygenFail = "falcon keygen failed error is: %d"
-	errSignFail   = "falcon sign failed error is: %d"
-	errVerifyFail = "falcon verify failed error is: %d"
+	errKeygenFail  = "falcon keygen failed error is: %d"
+	errSignFail    = "falcon sign failed error is: %d"
+	errVerifyFail  = "falcon verify failed error is: %d"
 	errConvertFail = "falcon convert to CT failed error is: %d"
 )
 const (
@@ -132,7 +132,7 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 
 	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), msgData, C.size_t(msgLen))
 	if r != 0 {
-		return  fmt.Errorf(errVerifyFail, int(r))
+		return fmt.Errorf(errVerifyFail, int(r))
 	}
 
 	runtime.KeepAlive(msg)
@@ -146,9 +146,9 @@ func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error 
 	if len(msg) > 0 {
 		data = unsafe.Pointer(&msg[0])
 	}
-	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]),  unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
+	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
 	if r != 0 {
-		return  fmt.Errorf(errVerifyFail, int(r))
+		return fmt.Errorf(errVerifyFail, int(r))
 	}
 
 	runtime.KeepAlive(msg)
@@ -157,18 +157,19 @@ func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error 
 
 // SaltVersion returns the salt version number used in the signature.
 // The default salt version is 0, if the signature is too short.
-func (sig CompressedSignature) SaltVersion() int {
-	if len(sig) < 2 {
-		return 0
+func (sig *CompressedSignature) SaltVersion() int {
+	if len(*sig) < 2 {
+		return -1
 	}
-	return int(sig[1])
+	return int((*sig)[1])
 }
 
 // SaltVersion returns the salt version number used in the signature.
 // The default salt version is 0, if the signature is too short.
-func (sig CTSignature) SaltVersion() int {
-	if len(sig) < 2 {
-		return 0
+func (sig *CTSignature) SaltVersion() int {
+	emptyCT := CTSignature{}
+	if *sig == emptyCT {
+		return -1
 	}
 	return int(sig[1])
 }
