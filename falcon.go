@@ -26,17 +26,20 @@ package falcon
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"unsafe"
 )
 
-const (
-	errKeygenFail  = "falcon keygen failed error is: %d"
-	errSignFail    = "falcon sign failed error is: %d"
-	errVerifyFail  = "falcon verify failed error is: %d"
-	errConvertFail = "falcon convert to CT failed error is: %d"
+// Falcon cgo errors
+var (
+	ErrKeygenFail  = errors.New("falcon keygen failed")
+	ErrSignFail    = errors.New("falcon sign failed")
+	ErrVerifyFail  = errors.New("falcon verify failed")
+	ErrConvertFail = errors.New("falcon convert to CT failed")
 )
+
 const (
 	// PublicKeySize is the size of a Falcon public key.
 	PublicKeySize = C.FALCON_DET1024_PUBKEY_SIZE
@@ -51,7 +54,10 @@ const (
 	SignatureMaxSize = C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE
 )
 
+// PublicKey represents  a falcon public key
 type PublicKey [PublicKeySize]byte
+
+// PrivateKey represents  a falcon private key
 type PrivateKey [PrivateKeySize]byte
 
 // CompressedSignature is a deterministic Falcon signature in compressed
@@ -78,7 +84,7 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 
 	r := C.falcon_det1024_keygen(&rng, unsafe.Pointer(&privateKey[0]), unsafe.Pointer(&publicKey[0]))
 	if r != 0 {
-		return PublicKey{}, PrivateKey{}, fmt.Errorf(errKeygenFail, int(r))
+		return PublicKey{}, PrivateKey{}, fmt.Errorf("error code is %d: %w", int(r), ErrKeygenFail)
 	}
 
 	runtime.KeepAlive(seed)
@@ -96,9 +102,9 @@ func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 
 	var sigLen C.size_t
 	var sig [SignatureMaxSize]byte
-	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(cdata), C.size_t(msgLen))
+	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(sk), unsafe.Pointer(cdata), C.size_t(msgLen))
 	if r != 0 {
-		return nil, fmt.Errorf(errSignFail, int(r))
+		return nil, fmt.Errorf("error code %d: %w", int(r), ErrSignFail)
 	}
 
 	runtime.KeepAlive(msg)
@@ -111,7 +117,7 @@ func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 
 	r := C.falcon_det1024_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), unsafe.Pointer(&(*sig)[0]), C.size_t(len(*sig)))
 	if r != 0 {
-		return CTSignature{}, fmt.Errorf(errConvertFail, int(r))
+		return CTSignature{}, fmt.Errorf("error code %d: %w", int(r), ErrConvertFail)
 	}
 	return sigCT, nil
 }
@@ -130,9 +136,9 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 		sigData = unsafe.Pointer(&signature[0])
 	}
 
-	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), msgData, C.size_t(msgLen))
+	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(pk), msgData, C.size_t(msgLen))
 	if r != 0 {
-		return fmt.Errorf(errVerifyFail, int(r))
+		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
 
 	runtime.KeepAlive(msg)
@@ -146,12 +152,13 @@ func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error 
 	if len(msg) > 0 {
 		data = unsafe.Pointer(&msg[0])
 	}
-	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
+	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(pk), data, C.size_t(len(msg)))
 	if r != 0 {
-		return fmt.Errorf(errVerifyFail, int(r))
+		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
 
 	runtime.KeepAlive(msg)
+	runtime.KeepAlive(signature)
 	return nil
 }
 
