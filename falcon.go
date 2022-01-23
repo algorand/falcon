@@ -166,7 +166,7 @@ func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error 
 // The default salt version is 0, if the signature is too short.
 func (sig *CompressedSignature) SaltVersion() int {
 	if len(*sig) < 2 {
-		return -1
+		return 0
 	}
 	return int((*sig)[1])
 }
@@ -174,9 +174,5 @@ func (sig *CompressedSignature) SaltVersion() int {
 // SaltVersion returns the salt version number used in the signature.
 // The default salt version is 0, if the signature is too short.
 func (sig *CTSignature) SaltVersion() int {
-	emptyCT := CTSignature{}
-	if *sig == emptyCT {
-		return -1
-	}
 	return int(sig[1])
 }
