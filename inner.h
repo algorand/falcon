@@ -73,45 +73,9 @@
  *    function does nothing, so it can be called systematically.
  */
 
-// yyyPQCLEAN+0 yyyNIST+0 yyySUPERCOP+0
-#include "config.h"
-// yyyPQCLEAN- yyyNIST- yyySUPERCOP-
-// yyySUPERCOP+1
-// yyyCONF*
-// yyySUPERCOP-
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#if defined FALCON_AVX2 && FALCON_AVX2 // yyyAVX2+1
-/*
- * This implementation uses AVX2 and optionally FMA intrinsics.
- */
-#include <immintrin.h>
-#ifndef FALCON_LE
-#define FALCON_LE   1
-#endif
-#ifndef FALCON_UNALIGNED
-#define FALCON_UNALIGNED   1
-#endif
-#if defined __GNUC__
-#if defined FALCON_FMA && FALCON_FMA
-#define TARGET_AVX2   __attribute__((target("avx2,fma")))
-#else
-#define TARGET_AVX2   __attribute__((target("avx2")))
-#endif
-#elif defined _MSC_VER && _MSC_VER
-#pragma warning( disable : 4752 )
-#endif
-#if defined FALCON_FMA && FALCON_FMA
-#define FMADD(a, b, c)   _mm256_fmadd_pd(a, b, c)
-#define FMSUB(a, b, c)   _mm256_fmsub_pd(a, b, c)
-#else
-#define FMADD(a, b, c)   _mm256_add_pd(_mm256_mul_pd(a, b), c)
-#define FMSUB(a, b, c)   _mm256_sub_pd(_mm256_mul_pd(a, b), c)
-#endif
-#endif // yyyAVX2-
 
 // yyyNIST+0 yyyPQCLEAN+0
 /*
@@ -123,20 +87,6 @@
 #pragma warning( disable : 4146 )
 #endif
 
-// yyySUPERCOP+0
-/*
- * Enable ARM assembly on any ARMv7m platform (if it was not done before).
- */
-#ifndef FALCON_ASM_CORTEXM4
-#if (defined __ARM_ARCH_7EM__ && __ARM_ARCH_7EM__) \
-	&& (defined __ARM_FEATURE_DSP && __ARM_FEATURE_DSP)
-#define FALCON_ASM_CORTEXM4   1
-#else
-#define FALCON_ASM_CORTEXM4   0
-#endif
-#endif
-// yyySUPERCOP-
-
 #if defined __i386__ || defined _M_IX86 \
 	|| defined __x86_64__ || defined _M_X64 || \
 	(defined _ARCH_PWR8 && \
@@ -147,15 +97,6 @@
 #endif
 #ifndef FALCON_UNALIGNED
 #define FALCON_UNALIGNED   1
-#endif
-
-#elif defined FALCON_ASM_CORTEXM4 && FALCON_ASM_CORTEXM4
-
-#ifndef FALCON_LE
-#define FALCON_LE     1
-#endif
-#ifndef FALCON_UNALIGNED
-#define FALCON_UNALIGNED   0
 #endif
 
 #elif (defined __LITTLE_ENDIAN__ && __LITTLE_ENDIAN__) \
@@ -178,48 +119,6 @@
 #define FALCON_UNALIGNED   0
 #endif
 
-#endif
-
-/*
- * We ensure that both FALCON_FPEMU and FALCON_FPNATIVE are defined,
- * with compatible values (exactly one of them must be non-zero).
- * If none is defined, then default FP implementation is 'native'
- * except on ARM Cortex M4.
- */
-#if !defined FALCON_FPEMU && !defined FALCON_FPNATIVE
-
-#if (defined __ARM_FP && ((__ARM_FP & 0x08) == 0x08)) \
-	|| (!defined __ARM_FP && defined __ARM_VFPV2__)
-#define FALCON_FPEMU      0
-#define FALCON_FPNATIVE   1
-#elif defined FALCON_ASM_CORTEXM4 && FALCON_ASM_CORTEXM4
-#define FALCON_FPEMU      1
-#define FALCON_FPNATIVE   0
-#else
-#define FALCON_FPEMU      0
-#define FALCON_FPNATIVE   1
-#endif
-
-#elif defined FALCON_FPEMU && !defined FALCON_FPNATIVE
-
-#if FALCON_FPEMU
-#define FALCON_FPNATIVE   0
-#else
-#define FALCON_FPNATIVE   1
-#endif
-
-#elif defined FALCON_FPNATIVE && !defined FALCON_FPEMU
-
-#if FALCON_FPNATIVE
-#define FALCON_FPEMU   0
-#else
-#define FALCON_FPEMU   1
-#endif
-
-#endif
-
-#if (FALCON_FPEMU && FALCON_FPNATIVE) || (!FALCON_FPEMU && !FALCON_FPNATIVE)
-#error Exactly one of FALCON_FPEMU and FALCON_FPNATIVE must be selected
 #endif
 
 // yyySUPERCOP+0
@@ -271,12 +170,6 @@
  * For still undefined compile-time macros, define them to 0 to avoid
  * warnings with -Wundef.
  */
-#ifndef FALCON_AVX2
-#define FALCON_AVX2   0
-#endif
-#ifndef FALCON_FMA
-#define FALCON_FMA   0
-#endif
 #ifndef FALCON_KG_CHACHA20
 #define FALCON_KG_CHACHA20   0
 #endif
@@ -295,18 +188,6 @@
 #define Zf__(prefix, name)   prefix ## _ ## name  
 // yyyPQCLEAN- yyySUPERCOP-
 
-// yyyAVX2+1
-/*
- * We use the TARGET_AVX2 macro to tag some functions which, in some
- * configurations, may use AVX2 and FMA intrinsics; this depends on
- * the compiler. In all other cases, we just define it to emptiness
- * (i.e. it will have no effect).
- */
-#ifndef TARGET_AVX2
-#define TARGET_AVX2
-#endif
-// yyyAVX2-
-
 /*
  * Some computations with floating-point elements, in particular
  * rounding to the nearest integer, rely on operations using _exactly_
@@ -323,74 +204,11 @@
  * targets other than 32-bit x86, or when the native 'double' type is
  * not used, the set_fpu_cw() function does nothing at all.
  */
-#if FALCON_FPNATIVE  // yyyFPNATIVE+1
-#if defined __GNUC__ && defined __i386__
-static inline unsigned
-set_fpu_cw(unsigned x)
-{
-	unsigned short t;
-	unsigned old;
-
-	__asm__ __volatile__ ("fstcw %0" : "=m" (t) : : );
-	old = (t & 0x0300u) >> 8;
-	t = (unsigned short)((t & ~0x0300u) | (x << 8));
-	__asm__ __volatile__ ("fldcw %0" : : "m" (t) : );
-	return old;
-}
-#elif defined _M_IX86
-static inline unsigned
-set_fpu_cw(unsigned x)
-{
-	unsigned short t;
-	unsigned old;
-
-	__asm { fstcw t }
-	old = (t & 0x0300u) >> 8;
-	t = (unsigned short)((t & ~0x0300u) | (x << 8));
-	__asm { fldcw t }
-	return old;
-}
-#else
 static inline unsigned
 set_fpu_cw(unsigned x)
 {
 	return x;
 }
-#endif
-#else  // yyyFPNATIVE+0
-static inline unsigned
-set_fpu_cw(unsigned x)
-{
-	return x;
-}
-#endif  // yyyFPNATIVE-
-
-#if FALCON_FPNATIVE && !FALCON_AVX2  // yyyFPNATIVE+1 yyyAVX2+0
-/*
- * If using the native 'double' type but not AVX2 code, on an x86
- * machine with SSE2 activated for maths, then we will use the
- * SSE2 intrinsics.
- */
-#if defined __GNUC__ && defined __SSE2_MATH__
-#include <immintrin.h>
-#endif
-#endif  // yyyFPNATIVE- yyyAVX2-
-
-#if FALCON_FPNATIVE  // yyyFPNATIVE+1
-/*
- * For optimal reproducibility of values, we need to disable contraction
- * of floating-point expressions; otherwise, on some architectures (e.g.
- * PowerPC), the compiler may generate fused-multiply-add opcodes that
- * may round differently than two successive separate opcodes. C99 defines
- * a standard pragma for that, but GCC-6.2.2 appears to ignore it,
- * hence the GCC-specific pragma (that Clang does not support).
- */
-#if defined __clang__
-#pragma STDC FP_CONTRACT OFF
-#elif defined __GNUC__
-#pragma GCC optimize ("fp-contract=off")
-#endif
-#endif  // yyyFPNATIVE-
 
 // yyyPQCLEAN+0
 /*
@@ -1155,10 +973,8 @@ typedef struct {
 	fpr sigma_min;
 } sampler_context;
 
-TARGET_AVX2
 int Zf(sampler)(void *ctx, fpr mu, fpr isigma);
 
-TARGET_AVX2
 int Zf(gaussian0_sampler)(prng *p);
 
 /* ==================================================================== */

@@ -35,7 +35,7 @@
 #   CC       C compiler; GCC or Clang are fine; MSVC (2015+) works too.
 #   CFLAGS   Compilation flags:
 #             * Optimization level -O2 or higher is recommended
-#            See config.h for some possible configuration macros.
+#            See for some possible configuration macros.
 #   LD       Linker; normally the same command as the compiler.
 #   LDFLAGS  Linker options, not counting the extra libs.
 #   LIBS     Extra libraries for linking:
@@ -67,44 +67,44 @@ tests/test_falcon: tests/test_falcon.o $(OBJ)
 tests/speed: tests/speed.o $(OBJ)
 	$(LD) $(LDFLAGS) -o tests/speed tests/speed.o $(OBJ) $(LIBS)
 
-codec.o: codec.c config.h inner.h fpr.h
+codec.o: codec.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o codec.o codec.c
 
-common.o: common.c config.h inner.h fpr.h
+common.o: common.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o common.o common.c
 
 deterministic.o: deterministic.c deterministic.h falcon.h
 	$(CC) $(CFLAGS) -c -o deterministic.o deterministic.c
 
-falcon.o: falcon.c falcon.h config.h inner.h fpr.h
+falcon.o: falcon.c falcon.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o falcon.o falcon.c
 
-fft.o: fft.c config.h inner.h fpr.h
+fft.o: fft.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o fft.o fft.c
 
-fpr.o: fpr.c config.h inner.h fpr.h
+fpr.o: fpr.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o fpr.o fpr.c
 
-keygen.o: keygen.c config.h inner.h fpr.h
+keygen.o: keygen.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o keygen.o keygen.c
 
-rng.o: rng.c config.h inner.h fpr.h
+rng.o: rng.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o rng.o rng.c
 
-shake.o: shake.c config.h inner.h fpr.h
+shake.o: shake.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o shake.o shake.c
 
-sign.o: sign.c config.h inner.h fpr.h
+sign.o: sign.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o sign.o sign.c
 
 tests/speed.o: tests/speed.c falcon.h
 	$(CC) $(CFLAGS) -c -o tests/speed.o tests/speed.c
 
-tests/test_falcon.o: tests/test_falcon.c falcon.h config.h inner.h fpr.h
+tests/test_falcon.o: tests/test_falcon.c falcon.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o tests/test_falcon.o tests/test_falcon.c
 
-tests/test_deterministic.o: tests/test_deterministic.c deterministic.h falcon.h config.h inner.h fpr.h
+tests/test_deterministic.o: tests/test_deterministic.c deterministic.h falcon.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o tests/test_deterministic.o tests/test_deterministic.c
 
-vrfy.o: vrfy.c config.h inner.h fpr.h
+vrfy.o: vrfy.c inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o vrfy.o vrfy.c

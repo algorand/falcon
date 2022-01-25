@@ -328,7 +328,6 @@ typedef int (*samplerZ)(void *ctx, fpr mu, fpr sigma);
  * is written over (t0,t1). The Gram matrix is modified as well. The
  * tmp[] buffer must have room for four polynomials.
  */
-TARGET_AVX2
 static void
 ffSampling_fft_dyntree(samplerZ samp, void *samp_ctx,
 	fpr *restrict t0, fpr *restrict t1,
@@ -421,7 +420,6 @@ ffSampling_fft_dyntree(samplerZ samp, void *samp_ctx,
  * Perform Fast Fourier Sampling for target vector t and LDL tree T.
  * tmp[] must have size for at least two polynomials of size 2^logn.
  */
-TARGET_AVX2
 static void
 ffSampling_fft(samplerZ samp, void *samp_ctx,
 	fpr *restrict z0, fpr *restrict z1,
@@ -436,123 +434,6 @@ ffSampling_fft(samplerZ samp, void *samp_ctx,
 	 * When logn == 2, we inline the last two recursion levels.
 	 */
 	if (logn == 2) {
-#if FALCON_AVX2  // yyyAVX2+1
-		fpr w0, w1, w2, w3, sigma;
-		__m128d ww0, ww1, wa, wb, wc, wd;
-		__m128d wy0, wy1, wz0, wz1;
-		__m128d half, invsqrt8, invsqrt2, neghi, neglo;
-		int si0, si1, si2, si3;
-
-		tree0 = tree + 4;
-		tree1 = tree + 8;
-
-		half = _mm_set1_pd(0.5);
-		invsqrt8 = _mm_set1_pd(0.353553390593273762200422181052);
-		invsqrt2 = _mm_set1_pd(0.707106781186547524400844362105);
-		neghi = _mm_set_pd(-0.0, 0.0);
-		neglo = _mm_set_pd(0.0, -0.0);
-
-		/*
-		 * We split t1 into w*, then do the recursive invocation,
-		 * with output in w*. We finally merge back into z1.
-		 */
-		ww0 = _mm_loadu_pd(&t1[0].v);
-		ww1 = _mm_loadu_pd(&t1[2].v);
-		wa = _mm_unpacklo_pd(ww0, ww1);
-		wb = _mm_unpackhi_pd(ww0, ww1);
-		wc = _mm_add_pd(wa, wb);
-		ww0 = _mm_mul_pd(wc, half);
-		wc = _mm_sub_pd(wa, wb);
-		wd = _mm_xor_pd(_mm_permute_pd(wc, 1), neghi);
-		ww1 = _mm_mul_pd(_mm_add_pd(wc, wd), invsqrt8);
-
-		w2.v = _mm_cvtsd_f64(ww1);
-		w3.v = _mm_cvtsd_f64(_mm_permute_pd(ww1, 1));
-		wa = ww1;
-		sigma = tree1[3];
-		si2 = samp(samp_ctx, w2, sigma);
-		si3 = samp(samp_ctx, w3, sigma);
-		ww1 = _mm_set_pd((double)si3, (double)si2);
-		wa = _mm_sub_pd(wa, ww1);
-		wb = _mm_loadu_pd(&tree1[0].v);
-		wc = _mm_mul_pd(wa, wb);
-		wd = _mm_mul_pd(wa, _mm_permute_pd(wb, 1));
-		wa = _mm_unpacklo_pd(wc, wd);
-		wb = _mm_unpackhi_pd(wc, wd);
-		ww0 = _mm_add_pd(ww0, _mm_add_pd(wa, _mm_xor_pd(wb, neglo)));
-		w0.v = _mm_cvtsd_f64(ww0);
-		w1.v = _mm_cvtsd_f64(_mm_permute_pd(ww0, 1));
-		sigma = tree1[2];
-		si0 = samp(samp_ctx, w0, sigma);
-		si1 = samp(samp_ctx, w1, sigma);
-		ww0 = _mm_set_pd((double)si1, (double)si0);
-
-		wc = _mm_mul_pd(
-			_mm_set_pd((double)(si2 + si3), (double)(si2 - si3)),
-			invsqrt2);
-		wa = _mm_add_pd(ww0, wc);
-		wb = _mm_sub_pd(ww0, wc);
-		ww0 = _mm_unpacklo_pd(wa, wb);
-		ww1 = _mm_unpackhi_pd(wa, wb);
-		_mm_storeu_pd(&z1[0].v, ww0);
-		_mm_storeu_pd(&z1[2].v, ww1);
-
-		/*
-		 * Compute tb0 = t0 + (t1 - z1) * L. Value tb0 ends up in w*.
-		 */
-		wy0 = _mm_sub_pd(_mm_loadu_pd(&t1[0].v), ww0);
-		wy1 = _mm_sub_pd(_mm_loadu_pd(&t1[2].v), ww1);
-		wz0 = _mm_loadu_pd(&tree[0].v);
-		wz1 = _mm_loadu_pd(&tree[2].v);
-		ww0 = _mm_sub_pd(_mm_mul_pd(wy0, wz0), _mm_mul_pd(wy1, wz1));
-		ww1 = _mm_add_pd(_mm_mul_pd(wy0, wz1), _mm_mul_pd(wy1, wz0));
-		ww0 = _mm_add_pd(ww0, _mm_loadu_pd(&t0[0].v));
-		ww1 = _mm_add_pd(ww1, _mm_loadu_pd(&t0[2].v));
-
-		/*
-		 * Second recursive invocation.
-		 */
-		wa = _mm_unpacklo_pd(ww0, ww1);
-		wb = _mm_unpackhi_pd(ww0, ww1);
-		wc = _mm_add_pd(wa, wb);
-		ww0 = _mm_mul_pd(wc, half);
-		wc = _mm_sub_pd(wa, wb);
-		wd = _mm_xor_pd(_mm_permute_pd(wc, 1), neghi);
-		ww1 = _mm_mul_pd(_mm_add_pd(wc, wd), invsqrt8);
-
-		w2.v = _mm_cvtsd_f64(ww1);
-		w3.v = _mm_cvtsd_f64(_mm_permute_pd(ww1, 1));
-		wa = ww1;
-		sigma = tree0[3];
-		si2 = samp(samp_ctx, w2, sigma);
-		si3 = samp(samp_ctx, w3, sigma);
-		ww1 = _mm_set_pd((double)si3, (double)si2);
-		wa = _mm_sub_pd(wa, ww1);
-		wb = _mm_loadu_pd(&tree0[0].v);
-		wc = _mm_mul_pd(wa, wb);
-		wd = _mm_mul_pd(wa, _mm_permute_pd(wb, 1));
-		wa = _mm_unpacklo_pd(wc, wd);
-		wb = _mm_unpackhi_pd(wc, wd);
-		ww0 = _mm_add_pd(ww0, _mm_add_pd(wa, _mm_xor_pd(wb, neglo)));
-		w0.v = _mm_cvtsd_f64(ww0);
-		w1.v = _mm_cvtsd_f64(_mm_permute_pd(ww0, 1));
-		sigma = tree0[2];
-		si0 = samp(samp_ctx, w0, sigma);
-		si1 = samp(samp_ctx, w1, sigma);
-		ww0 = _mm_set_pd((double)si1, (double)si0);
-
-		wc = _mm_mul_pd(
-			_mm_set_pd((double)(si2 + si3), (double)(si2 - si3)),
-			invsqrt2);
-		wa = _mm_add_pd(ww0, wc);
-		wb = _mm_sub_pd(ww0, wc);
-		ww0 = _mm_unpacklo_pd(wa, wb);
-		ww1 = _mm_unpackhi_pd(wa, wb);
-		_mm_storeu_pd(&z0[0].v, ww0);
-		_mm_storeu_pd(&z0[2].v, ww1);
-
-		return;
-#else  // yyyAVX2+0
 		fpr x0, x1, y0, y1, w0, w1, w2, w3, sigma;
 		fpr a_re, a_im, b_re, b_im, c_re, c_im;
 
@@ -675,7 +556,6 @@ ffSampling_fft(samplerZ samp, void *samp_ctx,
 		z0[3] = fpr_sub(a_im, c_im);
 
 		return;
-#endif  // yyyAVX2-
 	}
 
 	/*
@@ -1090,145 +970,9 @@ do_sign_dyn(samplerZ samp, void *samp_ctx, int16_t *s2,
  * Sample an integer value along a half-gaussian distribution centered
  * on zero and standard deviation 1.8205, with a precision of 72 bits.
  */
-TARGET_AVX2
 int
 Zf(gaussian0_sampler)(prng *p)
 {
-#if FALCON_AVX2 // yyyAVX2+1
-
-	/*
-	 * High words.
-	 */
-	static const union {
-		uint16_t u16[16];
-		__m256i ymm[1];
-	} rhi15 = {
-		{
-			0x51FB, 0x2A69, 0x113E, 0x0568,
-			0x014A, 0x003B, 0x0008, 0x0000,
-			0x0000, 0x0000, 0x0000, 0x0000,
-			0x0000, 0x0000, 0x0000, 0x0000
-		}
-	};
-
-	static const union {
-		uint64_t u64[20];
-		__m256i ymm[5];
-	} rlo57 = {
-		{
-			0x1F42ED3AC391802, 0x12B181F3F7DDB82,
-			0x1CDD0934829C1FF, 0x1754377C7994AE4,
-			0x1846CAEF33F1F6F, 0x14AC754ED74BD5F,
-			0x024DD542B776AE4, 0x1A1FFDC65AD63DA,
-			0x01F80D88A7B6428, 0x001C3FDB2040C69,
-			0x00012CF24D031FB, 0x00000949F8B091F,
-			0x0000003665DA998, 0x00000000EBF6EBB,
-			0x0000000002F5D7E, 0x000000000007098,
-			0x0000000000000C6, 0x000000000000001,
-			0x000000000000000, 0x000000000000000
-		}
-	};
-
-	uint64_t lo;
-	unsigned hi;
-	__m256i xhi, rhi, gthi, eqhi, eqm;
-	__m256i xlo, gtlo0, gtlo1, gtlo2, gtlo3, gtlo4;
-	__m128i t, zt;
-	int r;
-
-	/*
-	 * Get a 72-bit random value and split it into a low part
-	 * (57 bits) and a high part (15 bits)
-	 */
-	lo = prng_get_u64(p);
-	hi = prng_get_u8(p);
-	hi = (hi << 7) | (unsigned)(lo >> 57);
-	lo &= 0x1FFFFFFFFFFFFFF;
-
-	/*
-	 * Broadcast the high part and compare it with the relevant
-	 * values. We need both a "greater than" and an "equal"
-	 * comparisons.
-	 */
-	xhi = _mm256_broadcastw_epi16(_mm_cvtsi32_si128(hi));
-	rhi = _mm256_loadu_si256(&rhi15.ymm[0]);
-	gthi = _mm256_cmpgt_epi16(rhi, xhi);
-	eqhi = _mm256_cmpeq_epi16(rhi, xhi);
-
-	/*
-	 * The result is the number of 72-bit values (among the list of 19)
-	 * which are greater than the 72-bit random value. We first count
-	 * all non-zero 16-bit elements in the first eight of gthi. Such
-	 * elements have value -1 or 0, so we first negate them.
-	 */
-	t = _mm_srli_epi16(_mm256_castsi256_si128(gthi), 15);
-	zt = _mm_setzero_si128();
-	t = _mm_hadd_epi16(t, zt);
-	t = _mm_hadd_epi16(t, zt);
-	t = _mm_hadd_epi16(t, zt);
-	r = _mm_cvtsi128_si32(t);
-
-	/*
-	 * We must look at the low bits for all values for which the
-	 * high bits are an "equal" match; values 8-18 all have the
-	 * same high bits (0).
-	 * On 32-bit systems, 'lo' really is two registers, requiring
-	 * some extra code.
-	 */
-#if defined(__x86_64__) || defined(_M_X64)
-	xlo = _mm256_broadcastq_epi64(_mm_cvtsi64_si128(*(int64_t *)&lo));
-#else
-	{
-		uint32_t e0, e1;
-		int32_t f0, f1;
-
-		e0 = (uint32_t)lo;
-		e1 = (uint32_t)(lo >> 32);
-		f0 = *(int32_t *)&e0;
-		f1 = *(int32_t *)&e1;
-		xlo = _mm256_set_epi32(f1, f0, f1, f0, f1, f0, f1, f0);
-	}
-#endif
-	gtlo0 = _mm256_cmpgt_epi64(_mm256_loadu_si256(&rlo57.ymm[0]), xlo); 
-	gtlo1 = _mm256_cmpgt_epi64(_mm256_loadu_si256(&rlo57.ymm[1]), xlo); 
-	gtlo2 = _mm256_cmpgt_epi64(_mm256_loadu_si256(&rlo57.ymm[2]), xlo); 
-	gtlo3 = _mm256_cmpgt_epi64(_mm256_loadu_si256(&rlo57.ymm[3]), xlo); 
-	gtlo4 = _mm256_cmpgt_epi64(_mm256_loadu_si256(&rlo57.ymm[4]), xlo); 
-
-	/*
-	 * Keep only comparison results that correspond to the non-zero
-	 * elements in eqhi.
-	 */
-	gtlo0 = _mm256_and_si256(gtlo0, _mm256_cvtepi16_epi64(
-		_mm256_castsi256_si128(eqhi)));
-	gtlo1 = _mm256_and_si256(gtlo1, _mm256_cvtepi16_epi64(
-		_mm256_castsi256_si128(_mm256_bsrli_epi128(eqhi, 8))));
-	eqm = _mm256_permute4x64_epi64(eqhi, 0xFF);
-	gtlo2 = _mm256_and_si256(gtlo2, eqm);
-	gtlo3 = _mm256_and_si256(gtlo3, eqm);
-	gtlo4 = _mm256_and_si256(gtlo4, eqm);
-
-	/*
-	 * Add all values to count the total number of "-1" elements.
-	 * Since the first eight "high" words are all different, only
-	 * one element (at most) in gtlo0:gtlo1 can be non-zero; however,
-	 * if the high word of the random value is zero, then many
-	 * elements of gtlo2:gtlo3:gtlo4 can be non-zero.
-	 */
-	gtlo0 = _mm256_or_si256(gtlo0, gtlo1);
-	gtlo0 = _mm256_add_epi64(
-		_mm256_add_epi64(gtlo0, gtlo2),
-		_mm256_add_epi64(gtlo3, gtlo4));
-	t = _mm_add_epi64(
-		_mm256_castsi256_si128(gtlo0),
-		_mm256_extracti128_si256(gtlo0, 1));
-	t = _mm_add_epi64(t, _mm_srli_si128(t, 8));
-	r -= _mm_cvtsi128_si32(t);
-
-	return r;
-
-#else // yyyAVX2+0
-
 	static const uint32_t dist[] = {
 		10745844u,  3068844u,  3741698u,
 		 5559083u,  1580863u,  8248194u,
@@ -1281,14 +1025,11 @@ Zf(gaussian0_sampler)(prng *p)
 		z += (int)cc;
 	}
 	return z;
-
-#endif // yyyAVX2-
 }
 
 /*
  * Sample a bit with probability exp(-x) for some x >= 0.
  */
-TARGET_AVX2
 static int
 BerExp(prng *p, fpr x, fpr ccs)
 {
@@ -1352,7 +1093,6 @@ BerExp(prng *p, fpr x, fpr ccs)
  * The value of sigma MUST lie between 1 and 2 (i.e. isigma lies between
  * 0.5 and 1); in Falcon, sigma should always be between 1.2 and 1.9.
  */
-TARGET_AVX2
 int
 Zf(sampler)(void *ctx, fpr mu, fpr isigma)
 {
