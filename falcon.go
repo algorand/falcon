@@ -102,7 +102,7 @@ func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 
 	var sigLen C.size_t
 	var sig [SignatureMaxSize]byte
-	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(sk), unsafe.Pointer(cdata), C.size_t(msgLen))
+	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(cdata), C.size_t(msgLen))
 	if r != 0 {
 		return nil, fmt.Errorf("error code %d: %w", int(r), ErrSignFail)
 	}
@@ -136,7 +136,7 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 		sigData = unsafe.Pointer(&signature[0])
 	}
 
-	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(pk), msgData, C.size_t(msgLen))
+	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), msgData, C.size_t(msgLen))
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
@@ -152,7 +152,7 @@ func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error 
 	if len(msg) > 0 {
 		data = unsafe.Pointer(&msg[0])
 	}
-	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(pk), data, C.size_t(len(msg)))
+	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
