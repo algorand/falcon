@@ -5,14 +5,20 @@
 #include "inner.h"
 #include "deterministic.h"
 
+#define FALCON_DET1024_TMPSIZE_KEYGEN FALCON_TMPSIZE_KEYGEN(FALCON_DET1024_LOGN)
+#define FALCON_DET1024_TMPSIZE_SIGNDYN FALCON_TMPSIZE_SIGNDYN(FALCON_DET1024_LOGN)
+#define FALCON_DET1024_TMPSIZE_VERIFY FALCON_TMPSIZE_VERIFY(FALCON_DET1024_LOGN) 
+#define FALCON_DET1024_SALTED_SIG_COMPRESSED_MAXSIZE FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET1024_LOGN)
+#define FALCON_DET1024_SALTED_SIG_CT_SIZE FALCON_SIG_CT_SIZE(FALCON_DET1024_LOGN)
+
+
 int falcon_det1024_keygen(shake256_context *rng, void *privkey, void *pubkey) {
-	size_t tmpkg_len = FALCON_TMPSIZE_KEYGEN(FALCON_DET1024_LOGN);
-	uint8_t tmpkg[tmpkg_len];
+	uint8_t tmpkg[FALCON_DET1024_TMPSIZE_KEYGEN];
 
 	return falcon_keygen_make(rng, FALCON_DET1024_LOGN,
 		privkey, FALCON_DET1024_PRIVKEY_SIZE,
 		pubkey, FALCON_DET1024_PUBKEY_SIZE,
-		tmpkg, tmpkg_len);
+		tmpkg, FALCON_DET1024_TMPSIZE_KEYGEN);
 }
 
 // Domain separator used to construct the fixed versioned salt string.
@@ -30,13 +36,12 @@ int falcon_det1024_sign_compressed(void *sig, size_t *sig_len,
 
 	shake256_context detrng;
 	shake256_context hd;
-	size_t tmpsd_len = FALCON_TMPSIZE_SIGNDYN(FALCON_DET1024_LOGN);
-	uint8_t tmpsd[tmpsd_len];
+	uint8_t tmpsd[FALCON_DET1024_TMPSIZE_SIGNDYN];
 	uint8_t logn[1] = {FALCON_DET1024_LOGN};
 	uint8_t salt[40];
 
-	size_t saltedsig_len = FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET1024_LOGN);
-	uint8_t saltedsig[saltedsig_len];
+	size_t saltedsig_len = FALCON_DET1024_SALTED_SIG_COMPRESSED_MAXSIZE;
+	uint8_t saltedsig[FALCON_DET1024_SALTED_SIG_COMPRESSED_MAXSIZE];
 
 	if (falcon_get_logn(privkey, FALCON_DET1024_PRIVKEY_SIZE) != FALCON_DET1024_LOGN) {
 		return FALCON_ERR_FORMAT;
@@ -58,7 +63,7 @@ int falcon_det1024_sign_compressed(void *sig, size_t *sig_len,
 
 	int r = falcon_sign_dyn_finish(&detrng, saltedsig, &saltedsig_len,
 		FALCON_SIG_COMPRESSED, privkey, FALCON_DET1024_PRIVKEY_SIZE,
-		&hd, salt, tmpsd, tmpsd_len);
+		&hd, salt, tmpsd, FALCON_DET1024_TMPSIZE_SIGNDYN);
 	if (r != 0) {
 		return r;
 	}
@@ -85,7 +90,7 @@ int falcon_det1024_convert_compressed_to_ct(void *sig_ct,
 	}
 
         // Decode signature's s_bytes into 1024 signed-integer coefficients.
-	v = Zf(comp_decode)(coeffs, FALCON_DET1024_LOGN, sig_compressed+2, sig_compressed_len-2);
+	v = Zf(comp_decode)(coeffs, FALCON_DET1024_LOGN, ((uint8_t*)sig_compressed)+2, sig_compressed_len-2);
 	if (v == 0) {
 		return FALCON_ERR_SIZE;
 	}
@@ -116,32 +121,37 @@ void falcon_det1024_resalt(uint8_t *salted_sig,
 int falcon_det1024_verify_compressed(const void *sig, size_t sig_len,
         const void *pubkey, const void *data, size_t data_len) {
 
-	size_t tmpvv_len = FALCON_TMPSIZE_VERIFY(FALCON_DET1024_LOGN);
-	uint8_t tmpvv[tmpvv_len];
+	uint8_t tmpvv[FALCON_DET1024_TMPSIZE_VERIFY];
+	uint8_t salted_sig[FALCON_DET1024_SALTED_SIG_COMPRESSED_MAXSIZE];
 
-        // Add back the salt; drop the version byte.
-	size_t salted_sig_len = sig_len + 40 - 1;
-	uint8_t salted_sig[salted_sig_len];
+	if (sig_len < 2) {
+		return FALCON_ERR_BADSIG;
+	}
 
 	if (((uint8_t*)sig)[0] != FALCON_DET1024_SIG_COMPRESSED_HEADER) {
 		return FALCON_ERR_BADSIG;
 	}
 
+	// Add back the salt; drop the version byte.
+	size_t salted_sig_len = sig_len + 40 - 1;
+
+	if (salted_sig_len > FALCON_DET1024_SALTED_SIG_COMPRESSED_MAXSIZE){
+		return FALCON_ERR_BADSIG;
+	}
+
+
 	falcon_det1024_resalt(salted_sig, sig, sig_len);
 
 	return falcon_verify(salted_sig, salted_sig_len, FALCON_SIG_COMPRESSED,
 		pubkey, FALCON_DET1024_PUBKEY_SIZE, data, data_len,
-		tmpvv, tmpvv_len);
+		tmpvv, FALCON_DET1024_TMPSIZE_VERIFY);
 }
 
 int falcon_det1024_verify_ct(const void *sig,
         const void *pubkey, const void *data, size_t data_len) {
 
-	size_t tmpvv_len = FALCON_TMPSIZE_VERIFY(FALCON_DET1024_LOGN);
-	uint8_t tmpvv[tmpvv_len];
-
-	size_t salted_sig_len = FALCON_SIG_CT_SIZE(FALCON_DET1024_LOGN);
-	uint8_t salted_sig[salted_sig_len];
+	uint8_t tmpvv[FALCON_DET1024_TMPSIZE_VERIFY];
+	uint8_t salted_sig[FALCON_DET1024_SALTED_SIG_CT_SIZE];
 
 	if (((uint8_t*)sig)[0] != FALCON_DET1024_SIG_CT_HEADER) {
 		return FALCON_ERR_BADSIG;
@@ -149,11 +159,11 @@ int falcon_det1024_verify_ct(const void *sig,
 
 	falcon_det1024_resalt(salted_sig, sig, FALCON_DET1024_SIG_CT_SIZE);
 
-	return falcon_verify(salted_sig, salted_sig_len, FALCON_SIG_CT,
+	return falcon_verify(salted_sig, FALCON_DET1024_SALTED_SIG_CT_SIZE, FALCON_SIG_CT,
 		pubkey, FALCON_DET1024_PUBKEY_SIZE, data, data_len,
-		tmpvv, tmpvv_len);
+		tmpvv, FALCON_DET1024_TMPSIZE_VERIFY);
 }
 
 int falcon_det1024_get_salt_version(const void* sig) {
 	return ((uint8_t*)sig)[1];
-};
+}
