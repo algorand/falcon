@@ -119,6 +119,50 @@ int falcon_det1024_convert_compressed_to_ct(void *sig_ct,
  */
 int falcon_det1024_get_salt_version(const void* sig);
 
+/*
+ * Unpack a det1024 public key representing a ring element h to its
+ * vector of polynomial coefficients, i.e.,
+ *
+ * h(x) = h[0] + h[1] * x + h[2] * x^2 + ... + h[1023] * x^1023.
+ *
+ * Returns a non-zero error code if pubkey is invalid.
+ */
+int falcon_det1024_pubkey_coeffs(uint16_t *h, const void *pubkey);
+
+/*
+ * Hash data of length data_len, using the fixed 40-byte salt
+ * specified by salt_version, to a ring element c, represented by
+ * its vector of polynomial coefficients.
+ *
+ * (See Section 3.7 of the Falcon specification for the details of the
+ *  hashing, and Section 2.3.2-3 of the Deterministic Falcon
+ *  specification for the definition of the fixed salt.)
+ */
+void falcon_det1024_hash_to_point_coeffs(uint16_t *c, const void *data, size_t data_len, uint8_t salt_version);
+
+/*
+ * Unpack a det1024 signature in CT format to the vector of polynomial
+ * coefficients of the associated ring element s_2.
+ *
+ * (See Section 3.10 of the Falcon specification for details.)
+ *
+ * Returns a non-zero error code if sig cannot be properly unpacked.
+ */
+int falcon_det1024_s2_coeffs(int16_t *s2, const void* sig);
+
+/*
+ * Compute the vector of polynomial coefficients of s_1 = c - s_2 * h,
+ * given the unpacked values h, c, and s_2.
+ *
+ * (See Section 3.10 of the Falcon specification for details.)
+ *
+ * Returns a non-zero error code if the aggregate (s_1,s_2) vector is
+ * not short enough to constitute a valid signature (for the public
+ * key corresponding to h, the hash digest corresponding to c, and the
+ * signature corresponding to s_2).
+ */
+int falcon_det1024_s1_coeffs(int16_t *s1, const uint16_t *h, const uint16_t *c, const int16_t *s2);
+
 #ifdef __cplusplus
 }
 #endif

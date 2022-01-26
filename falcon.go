@@ -179,3 +179,60 @@ func (sig CompressedSignature) SaltVersion() byte {
 func (sig *CTSignature) SaltVersion() byte {
 	return sig[1]
 }
+
+// N=1024 is the degree of Falcon det1024 polynomials.
+const N = 1 << C.FALCON_DET1024_LOGN
+
+// Coefficients unpacks a public key representing a ring element h to its vector
+// of polynomial coefficients, i.e.,
+//
+// h(x) = h[0] + h[1] * x + h[2] * x^2 + ... + h[1023] * x^1023.
+//
+// Returns an error if pubkey is invalid.
+func (pub PublicKey) Coefficients() (h [N]uint16, err error) {
+	r := C.falcon_det1024_pubkey_coeffs((*C.uint16_t)(&h[0]), unsafe.Pointer(&pub[0]))
+	if r != 0 {
+		err = fmt.Errorf("falcon_det1024_pubkey_coeffs failed: %d", r)
+	}
+	return
+}
+
+// S2Coefficients unpacks a signature in CT format to the vector of polynomial
+// coefficients of the associated ring element s_2. See Section 3.10 of the
+// Falcon specification for details. Returns an error if sig cannot be properly
+// unpacked.
+func (sig CTSignature) S2Coefficients() (s2 [N]int16, err error) {
+	r := C.falcon_det1024_s2_coeffs((*C.int16_t)(&s2[0]), unsafe.Pointer(&sig[0]))
+	if r != 0 {
+		err = fmt.Errorf("falcon_det1024_s2_coeffs failed: %d", r)
+	}
+	return
+}
+
+// S1Coefficients computes the vector of polynomial coefficients of
+// s_1 = c - s_2 * h, given the unpacked values h, c, and s_2.
+// See Section 3.10 of the Falcon specification for details. Returns an error if
+// the aggregate (s_1,s_2) vector is not short enough to constitute a valid
+// signature (for the public key corresponding to h, the hash digest
+// corresponding to c, and the signature corresponding to s_2).
+func S1Coefficients(h [N]uint16, c [N]uint16, s2 [N]int16) (s1 [N]int16, err error) {
+	r := C.falcon_det1024_s1_coeffs((*C.int16_t)(&s1[0]), (*C.uint16_t)(&h[0]), (*C.uint16_t)(&c[0]), (*C.int16_t)(&s2[0]))
+	if r != 0 {
+		err = fmt.Errorf("falcon_det1024_s1_coeffs failed: %d", r)
+	}
+	return
+}
+
+// HashToPointCoefficients hashes msg using the fixed 40-byte salt specified by
+// saltVersion, to a ring element c, represented by its vector of polynomial
+// coefficients. See Section 3.7 of the Falcon specification for the details of the
+// hashing, and Section 2.3.2-3 of the Deterministic Falcon specification for
+// the definition of the fixed salt.
+func HashToPointCoefficients(msg []byte, saltVersion uint8) (c [N]uint16) {
+	data := C.NULL
+	if len(msg) > 0 {
+		data = unsafe.Pointer(&msg[0])
+	}
+	C.falcon_det1024_hash_to_point_coeffs((*C.uint16_t)(&c[0]), data, C.size_t(len(msg)), C.uint8_t(saltVersion))
+	return
+}

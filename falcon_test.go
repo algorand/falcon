@@ -133,6 +133,21 @@ func TestFalcon(t *testing.T) {
 		if err != nil {
 			t.Fatalf("verify_ct failed err msg %s on pk: %v , sk: %v, msg: %v", err, pub, priv, msg)
 		}
+
+		h, err := pub.Coefficients()
+		if err != nil {
+			t.Fatalf("pubkey coefficients failed: %s", err)
+		}
+		c := HashToPointCoefficients(msg, uint8(sigCT.SaltVersion()))
+		s2, err := sigCT.S2Coefficients()
+		if err != nil {
+			t.Fatalf("s2 coefficients failed: %s", err)
+		}
+		s1, err := S1Coefficients(h, c, s2)
+		if err != nil {
+			t.Fatalf("s1 coefficients failed: %s", err)
+		}
+		_ = s1
 	}
 }
 
