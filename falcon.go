@@ -50,7 +50,7 @@ const (
 	CurrentSaltVersion = C.FALCON_DET1024_CURRENT_SALT_VERSION
 	// CTSignatureSize is the size in bytes of a Falcon signature in CT format
 	CTSignatureSize = C.FALCON_DET1024_SIG_CT_SIZE
-	// SignatureMaxSize is the max possible size in bytes of a Falcon signature in a compressed format.
+	// SignatureMaxSize is the max possible size in bytes of a Falcon signature in compressed format.
 	SignatureMaxSize = C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE
 )
 
