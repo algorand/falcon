@@ -48,7 +48,7 @@ const (
 	// CurrentSaltVersion is the salt version number used to compute signatures.
 	// The salt version is incremented when the signing procedure changes (rarely).
 	CurrentSaltVersion = C.FALCON_DET1024_CURRENT_SALT_VERSION
-	// CTSignatureSize is the max size in bytes of a Falcon signature in CT format
+	// CTSignatureSize is the size in bytes of a Falcon signature in CT format
 	CTSignatureSize = C.FALCON_DET1024_SIG_CT_SIZE
 	// SignatureMaxSize is the max possible size in bytes of a Falcon signature in a compressed format.
 	SignatureMaxSize = C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE
