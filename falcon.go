@@ -173,8 +173,7 @@ func (sig *CompressedSignature) SaltVersion() int {
 	return int((*sig)[1])
 }
 
-// SaltVersion returns the salt version number used in the signature.
-// The default salt version is 0, if the signature is too short.
+// SaltVersion returns the salt version number used in a CT-format signature.
 func (sig *CTSignature) SaltVersion() int {
 	return int(sig[1])
 }
