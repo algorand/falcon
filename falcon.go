@@ -91,7 +91,7 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 	return publicKey, privateKey, nil
 }
 
-// SignCompressed signs the message with privateKey and returns a compressed
+// SignCompressed signs the message with privateKey and returns a compressed-format
 // signature, or an error if signing fails (e.g., due to a malformed private key).
 func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 	msgLen := len(msg)
@@ -111,7 +111,7 @@ func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 	return sig[:sigLen], nil
 }
 
-// ConvertToCT converts a compressed signature to a CT signature.
+// ConvertToCT converts a compressed-format signature to a CT-format signature.
 func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 	sigCT := CTSignature{}
 
@@ -122,7 +122,8 @@ func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 	return sigCT, nil
 }
 
-// Verify reports whether sig is a valid compressed signature of msg under publicKey.
+// Verify reports whether sig is a valid compressed-format signature of msg under publicKey.
+// It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 	msgLen := len(msg)
 	msgData := C.NULL
@@ -146,7 +147,8 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 	return nil
 }
 
-// VerifyCTSignature reports whether sig is a valid CT signature of msg under publicKey.
+// VerifyCTSignature reports whether sig is a valid CT-format signature of msg under publicKey.
+// It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error {
 	data := C.NULL
 	if len(msg) > 0 {
