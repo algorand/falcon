@@ -54,17 +54,17 @@ const (
 	SignatureMaxSize = C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE
 )
 
-// PublicKey represents  a falcon public key
+// PublicKey represents a falcon public key
 type PublicKey [PublicKeySize]byte
 
-// PrivateKey represents  a falcon private key
+// PrivateKey represents a falcon private key
 type PrivateKey [PrivateKeySize]byte
 
 // CompressedSignature is a deterministic Falcon signature in compressed
-// form, which is variable-length.
+// format, which is variable-length.
 type CompressedSignature []byte
 
-// CTSignature is a deterministic Falcon signature in constant-time form,
+// CTSignature is a deterministic Falcon signature in constant-time format,
 // which is fixed-length.
 type CTSignature [CTSignatureSize]byte
 
