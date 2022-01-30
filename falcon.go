@@ -48,23 +48,23 @@ const (
 	// CurrentSaltVersion is the salt version number used to compute signatures.
 	// The salt version is incremented when the signing procedure changes (rarely).
 	CurrentSaltVersion = C.FALCON_DET1024_CURRENT_SALT_VERSION
-	// CTSignatureSize is the max size in bytes of a Falcon signature in CT format
+	// CTSignatureSize is the size in bytes of a Falcon signature in CT format
 	CTSignatureSize = C.FALCON_DET1024_SIG_CT_SIZE
-	// SignatureMaxSize is the max possible size in bytes of a Falcon signature in a compressed format.
+	// SignatureMaxSize is the max possible size in bytes of a Falcon signature in compressed format.
 	SignatureMaxSize = C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE
 )
 
-// PublicKey represents  a falcon public key
+// PublicKey represents a falcon public key
 type PublicKey [PublicKeySize]byte
 
-// PrivateKey represents  a falcon private key
+// PrivateKey represents a falcon private key
 type PrivateKey [PrivateKeySize]byte
 
 // CompressedSignature is a deterministic Falcon signature in compressed
-// form, which is variable-length.
+// format, which is variable-length.
 type CompressedSignature []byte
 
-// CTSignature is a deterministic Falcon signature in constant-time form,
+// CTSignature is a deterministic Falcon signature in constant-time format,
 // which is fixed-length.
 type CTSignature [CTSignatureSize]byte
 
@@ -91,7 +91,7 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 	return publicKey, privateKey, nil
 }
 
-// SignCompressed signs the message with privateKey and returns a compressed
+// SignCompressed signs the message with privateKey and returns a compressed-format
 // signature, or an error if signing fails (e.g., due to a malformed private key).
 func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 	msgLen := len(msg)
@@ -111,7 +111,7 @@ func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 	return sig[:sigLen], nil
 }
 
-// ConvertToCT converts a compressed signature to a CT signature.
+// ConvertToCT converts a compressed-format signature to a CT-format signature.
 func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 	sigCT := CTSignature{}
 
@@ -122,7 +122,8 @@ func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 	return sigCT, nil
 }
 
-// Verify reports whether sig is a valid compressed signature of msg under publicKey.
+// Verify reports whether sig is a valid compressed-format signature of msg under publicKey.
+// It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 	msgLen := len(msg)
 	msgData := C.NULL
@@ -146,7 +147,8 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 	return nil
 }
 
-// VerifyCTSignature reports whether sig is a valid CT signature of msg under publicKey.
+// VerifyCTSignature reports whether sig is a valid CT-format signature of msg under publicKey.
+// It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error {
 	data := C.NULL
 	if len(msg) > 0 {
@@ -162,8 +164,8 @@ func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error 
 	return nil
 }
 
-// SaltVersion returns the salt version number used in the signature.
-// The default salt version is 0, if the signature is too short.
+// SaltVersion returns the salt version number used in a compressed-format signature.
+// The default salt version is 0, if the signature is too short to specify one.
 func (sig *CompressedSignature) SaltVersion() int {
 	if len(*sig) < 2 {
 		return 0
@@ -171,8 +173,7 @@ func (sig *CompressedSignature) SaltVersion() int {
 	return int((*sig)[1])
 }
 
-// SaltVersion returns the salt version number used in the signature.
-// The default salt version is 0, if the signature is too short.
+// SaltVersion returns the salt version number used in a CT-format signature.
 func (sig *CTSignature) SaltVersion() int {
 	return int(sig[1])
 }
