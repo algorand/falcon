@@ -162,6 +162,49 @@ func TestFalconCompressedSignatureSizes(t *testing.T) {
 
 }
 
+type someDataForTestPointerToPointer [128]byte
+
+type PointerToPointerPanicGenerator struct {
+	msg someDataForTestPointerToPointer
+	pub *PublicKey
+	sig []byte
+}
+
+func (v *PointerToPointerPanicGenerator) Panic() error {
+	return v.pub.Verify(v.msg[:], v.sig)
+}
+
+func TestPointerToPointer(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			t.Fail()
+		}
+	}()
+
+	seed := make([]byte, 64)
+	rand.Read(seed)
+
+	pub, priv, err := GenerateKey(seed)
+	if err != nil {
+		t.Fatalf("failed to generate keys. err message: %s", err)
+	}
+	msgHash := someDataForTestPointerToPointer{}
+	rand.Read(msgHash[:])
+	sig, err := priv.SignCompressed(msgHash[:])
+
+	if err != nil {
+		t.Fatalf("failed to sign message. err message: %s", err)
+	}
+
+	v := PointerToPointerPanicGenerator{
+		msg: msgHash,
+		pub: &pub,
+		sig: sig,
+	}
+	v.Panic()
+}
+
 func TestFalconSignNilMessage(t *testing.T) {
 	seed := make([]byte, 64)
 	rand.Read(seed)
