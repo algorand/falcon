@@ -149,11 +149,13 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 // VerifyCTSignature reports whether sig is a valid CT-format signature of msg under publicKey.
 // It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error {
-	data := C.NULL
+	var r C.int
 	if len(msg) > 0 {
-		data = unsafe.Pointer(&msg[0])
+		r = C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), unsafe.Pointer(&msg[0]), C.size_t(len(msg)))
+	} else {
+		r = C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), C.NULL, C.size_t(len(msg)))
 	}
-	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
+
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
