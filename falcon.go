@@ -94,15 +94,16 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 // SignCompressed signs the message with privateKey and returns a compressed-format
 // signature, or an error if signing fails (e.g., due to a malformed private key).
 func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
-	msgLen := len(msg)
-	cdata := (*C.uchar)(C.NULL)
-	if msgLen > 0 {
-		cdata = (*C.uchar)(&msg[0])
-	}
-
 	var sigLen C.size_t
 	var sig [SignatureMaxSize]byte
-	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(cdata), C.size_t(msgLen))
+	var r C.int
+
+	if msgLen := len(msg); msgLen > 0 {
+		r = C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(&msg[0]), C.size_t(msgLen))
+	} else {
+		r = C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), C.NULL, C.size_t(msgLen))
+	}
+
 	if r != 0 {
 		return nil, fmt.Errorf("error code %d: %w", int(r), ErrSignFail)
 	}
@@ -125,19 +126,19 @@ func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 // Verify reports whether sig is a valid compressed-format signature of msg under publicKey.
 // It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
-	msgLen := len(msg)
-	msgData := C.NULL
-	if msgLen > 0 {
-		msgData = unsafe.Pointer(&msg[0])
-	}
-
 	sigLen := len(signature)
 	sigData := C.NULL
 	if sigLen > 0 {
 		sigData = unsafe.Pointer(&signature[0])
 	}
 
-	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), msgData, C.size_t(msgLen))
+	var r C.int
+	if msgLen := len(msg); msgLen > 0 {
+		r = C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), unsafe.Pointer(&(msg[0])), C.size_t(msgLen))
+	} else {
+		r = C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), C.NULL, C.size_t(msgLen))
+	}
+
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
