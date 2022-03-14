@@ -71,13 +71,11 @@ type CTSignature [CTSignatureSize]byte
 // GenerateKey generates a public/private key pair from the given seed.
 func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 	var rng C.shake256_context
-
-	seedLen := len(seed)
-	seedData := (*C.uchar)(C.NULL)
-	if seedLen > 0 {
-		seedData = (*C.uchar)(&seed[0])
+	if seedLen := len(seed); seedLen > 0 {
+		C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(&seed[0]), C.size_t(seedLen))
+	} else {
+		C.shake256_init_prng_from_seed(&rng, (unsafe.Pointer)(C.NULL), C.size_t(seedLen))
 	}
-	C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(seedData), C.size_t(seedLen))
 
 	publicKey := PublicKey{}
 	privateKey := PrivateKey{}
