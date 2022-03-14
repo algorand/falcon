@@ -74,7 +74,7 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 	if seedLen := len(seed); seedLen > 0 {
 		C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(&seed[0]), C.size_t(seedLen))
 	} else {
-		C.shake256_init_prng_from_seed(&rng, (unsafe.Pointer)(C.NULL), C.size_t(seedLen))
+		C.shake256_init_prng_from_seed(&rng, C.NULL, C.size_t(seedLen))
 	}
 
 	publicKey := PublicKey{}
