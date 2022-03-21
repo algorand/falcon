@@ -171,14 +171,14 @@ type PointerToPointerPanicGenerator struct {
 }
 
 func (v *PointerToPointerPanicGenerator) Panic() error {
-	return v.pub.Verify(v.msg[:], v.sig)
+	return v.pub.Verify(v.sig, v.msg[:])
 }
 
 func TestPointerToPointer(t *testing.T) {
 	defer func() {
 		err := recover()
 		if err != nil {
-			t.Fail()
+			t.Fatalf("panic occurred, msg: %s", err)
 		}
 	}()
 
