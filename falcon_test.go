@@ -170,10 +170,6 @@ type PointerToPointerPanicGenerator struct {
 	sig []byte
 }
 
-func (v *PointerToPointerPanicGenerator) Panic() error {
-	return v.pub.Verify(v.sig, v.msg[:])
-}
-
 func TestPointerToPointer(t *testing.T) {
 	defer func() {
 		err := recover()
@@ -202,7 +198,7 @@ func TestPointerToPointer(t *testing.T) {
 		pub: &pub,
 		sig: sig,
 	}
-	v.Panic()
+	v.pub.Verify(v.sig, v.msg[:])
 }
 
 func TestFalconSignNilMessage(t *testing.T) {
