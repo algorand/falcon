@@ -104,7 +104,7 @@ func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 
 	var sigLen C.size_t
 	var sig [SignatureMaxSize]byte
-	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), cdata, C.size_t(msgLen))
+	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), cdata, msgLen)
 	if r != 0 {
 		return nil, fmt.Errorf("error code %d: %w", int(r), ErrSignFail)
 	}
@@ -115,9 +115,10 @@ func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 
 // ConvertToCT converts a compressed-format signature to a CT-format signature.
 func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
-	sigCT := CTSignature{}
+	var sigCT CTSignature
 
-	r := C.falcon_det1024_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), unsafe.Pointer(&(*sig)[0]), C.size_t(len(*sig)))
+	sigData, sigLen := byteSlice(*sig).intoUnsafePointer()
+	r := C.falcon_det1024_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), sigData, sigLen)
 	if r != 0 {
 		return CTSignature{}, fmt.Errorf("error code %d: %w", int(r), ErrConvertFail)
 	}
