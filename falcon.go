@@ -164,16 +164,17 @@ func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error 
 	return nil
 }
 
-// SaltVersion returns the salt version number used in a compressed-format signature.
+// SaltVersion returns the salt version used in a compressed-format signature.
 // The default salt version is 0, if the signature is too short to specify one.
-func (sig *CompressedSignature) SaltVersion() int {
+// (Such a signature is malformed, and would not verify, but is still considered to have a salt version.)
+func (sig *CompressedSignature) SaltVersion() byte {
 	if len(*sig) < 2 {
 		return 0
 	}
-	return int((*sig)[1])
+	return (*sig)[1]
 }
 
-// SaltVersion returns the salt version number used in a CT-format signature.
-func (sig *CTSignature) SaltVersion() int {
-	return int(sig[1])
+// SaltVersion returns the salt version used in a CT-format signature.
+func (sig *CTSignature) SaltVersion() byte {
+	return sig[1]
 }
