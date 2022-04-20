@@ -228,7 +228,7 @@ func S1Coefficients(h [N]uint16, c [N]uint16, s2 [N]int16) (s1 [N]int16, err err
 // coefficients. See Section 3.7 of the Falcon specification for the details of the
 // hashing, and Section 2.3.2-3 of the Deterministic Falcon specification for
 // the definition of the fixed salt.
-func HashToPointCoefficients(msg []byte, saltVersion uint8) (c [N]uint16) {
+func HashToPointCoefficients(msg []byte, saltVersion byte) (c [N]uint16) {
 	data := C.NULL
 	if len(msg) > 0 {
 		data = unsafe.Pointer(&msg[0])

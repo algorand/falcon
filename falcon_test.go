@@ -138,7 +138,7 @@ func TestFalcon(t *testing.T) {
 		if err != nil {
 			t.Fatalf("pubkey coefficients failed: %s", err)
 		}
-		c := HashToPointCoefficients(msg, uint8(sigCT.SaltVersion()))
+		c := HashToPointCoefficients(msg, sigCT.SaltVersion())
 		s2, err := sigCT.S2Coefficients()
 		if err != nil {
 			t.Fatalf("s2 coefficients failed: %s", err)
