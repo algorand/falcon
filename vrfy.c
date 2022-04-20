@@ -631,15 +631,15 @@ mq_poly_sub(uint16_t *f, const uint16_t *g, unsigned logn)
 }
 
 // NTT functions exported for use in deterministic.h
-void Zf(mq_NTT)(uint16_t *a, unsigned logn)  { mq_NTT(a, logn); };
-void Zf(mq_iNTT)(uint16_t *a, unsigned logn) { mq_iNTT(a, logn); };
+void Zf(mq_NTT)(uint16_t *a, unsigned logn)  { mq_NTT(a, logn); }
+void Zf(mq_iNTT)(uint16_t *a, unsigned logn) { mq_iNTT(a, logn); }
 void Zf(mq_poly_montymul_ntt)(uint16_t *f, const uint16_t *g, unsigned logn) {
 	mq_poly_montymul_ntt(f, g, logn);
-};
+}
 void Zf(mq_poly_sub)(uint16_t *f, const uint16_t *g, unsigned logn) {
 	mq_poly_sub(f, g, logn);
-};
-uint32_t Zf(mq_sub)(uint32_t x, uint32_t y) { return mq_sub(x, y); };
+}
+uint32_t Zf(mq_sub)(uint32_t x, uint32_t y) { return mq_sub(x, y); }
 
 /* ===================================================================== */
 
