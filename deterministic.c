@@ -174,7 +174,7 @@ int falcon_det1024_pubkey_coeffs(uint16_t *h, const void *pubkey) {
 	/*
 	 * Decode public key.
 	 */
-	if (Zf(modq_decode)(h, FALCON_DET1024_LOGN, pubkey + 1, FALCON_DET1024_PUBKEY_SIZE - 1)
+	if (Zf(modq_decode)(h, FALCON_DET1024_LOGN, (uint8_t*)pubkey + 1, FALCON_DET1024_PUBKEY_SIZE - 1)
 		!= FALCON_DET1024_PUBKEY_SIZE - 1)
 	{
 		return FALCON_ERR_FORMAT;
@@ -205,7 +205,7 @@ int falcon_det1024_s2_coeffs(int16_t *s2, const void* sig) {
 		return FALCON_ERR_FORMAT;
 	}
 
-	int v = Zf(trim_i16_decode)(s2, logn, Zf(max_sig_bits)[logn], sig+2, FALCON_DET1024_SIG_CT_SIZE-2);
+	size_t v = Zf(trim_i16_decode)(s2, logn, Zf(max_sig_bits)[logn], (uint8_t*)sig+2, FALCON_DET1024_SIG_CT_SIZE-2);
 	if (v != FALCON_DET1024_SIG_CT_SIZE-2) {
 		return FALCON_ERR_FORMAT;
 	}
