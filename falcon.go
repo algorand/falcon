@@ -74,16 +74,22 @@ type CompressedSignature []byte
 // which is fixed-length.
 type CTSignature [CTSignatureSize]byte
 
+type byteSlice []byte
+
+func (s byteSlice) intoUnsafePointer() (unsafe.Pointer, C.size_t) {
+	if msgLen := len(s); msgLen > 0 {
+		cpy := make([]byte, msgLen)
+		copy(cpy, s)
+		return (unsafe.Pointer)(&cpy[0]), C.size_t(msgLen)
+	}
+	return C.NULL, 0
+}
+
 // GenerateKey generates a public/private key pair from the given seed.
 func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
+	seedData, seedLen := byteSlice(seed).intoUnsafePointer()
 	var rng C.shake256_context
-
-	seedLen := len(seed)
-	seedData := (*C.uchar)(C.NULL)
-	if seedLen > 0 {
-		seedData = (*C.uchar)(&seed[0])
-	}
-	C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(seedData), C.size_t(seedLen))
+	C.shake256_init_prng_from_seed(&rng, seedData, seedLen)
 
 	publicKey := PublicKey{}
 	privateKey := PrivateKey{}
@@ -100,15 +106,11 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 // SignCompressed signs the message with privateKey and returns a compressed-format
 // signature, or an error if signing fails (e.g., due to a malformed private key).
 func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
-	msgLen := len(msg)
-	cdata := (*C.uchar)(C.NULL)
-	if msgLen > 0 {
-		cdata = (*C.uchar)(&msg[0])
-	}
+	cdata, msgLen := byteSlice(msg).intoUnsafePointer()
 
 	var sigLen C.size_t
 	var sig [SignatureMaxSize]byte
-	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(cdata), C.size_t(msgLen))
+	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), cdata, msgLen)
 	if r != 0 {
 		return nil, fmt.Errorf("error code %d: %w", int(r), ErrSignFail)
 	}
@@ -119,9 +121,10 @@ func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
 
 // ConvertToCT converts a compressed-format signature to a CT-format signature.
 func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
-	sigCT := CTSignature{}
+	var sigCT CTSignature
 
-	r := C.falcon_det1024_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), unsafe.Pointer(&(*sig)[0]), C.size_t(len(*sig)))
+	sigData, sigLen := byteSlice(*sig).intoUnsafePointer()
+	r := C.falcon_det1024_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), sigData, sigLen)
 	if r != 0 {
 		return CTSignature{}, fmt.Errorf("error code %d: %w", int(r), ErrConvertFail)
 	}
@@ -131,19 +134,10 @@ func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 // Verify reports whether sig is a valid compressed-format signature of msg under publicKey.
 // It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
-	msgLen := len(msg)
-	msgData := C.NULL
-	if msgLen > 0 {
-		msgData = unsafe.Pointer(&msg[0])
-	}
+	msgData, msgLen := byteSlice(msg).intoUnsafePointer()
+	sigData, sigLen := byteSlice(signature).intoUnsafePointer()
 
-	sigLen := len(signature)
-	sigData := C.NULL
-	if sigLen > 0 {
-		sigData = unsafe.Pointer(&signature[0])
-	}
-
-	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), msgData, C.size_t(msgLen))
+	r := C.falcon_det1024_verify_compressed(sigData, sigLen, unsafe.Pointer(&(*pk)), msgData, msgLen)
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
@@ -156,11 +150,9 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 // VerifyCTSignature reports whether sig is a valid CT-format signature of msg under publicKey.
 // It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error {
-	data := C.NULL
-	if len(msg) > 0 {
-		data = unsafe.Pointer(&msg[0])
-	}
-	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
+	data, dataLen := byteSlice(msg).intoUnsafePointer()
+
+	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), data, dataLen)
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
