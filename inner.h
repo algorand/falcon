@@ -1161,6 +1161,35 @@ int Zf(sampler)(void *ctx, fpr mu, fpr isigma);
 TARGET_AVX2
 int Zf(gaussian0_sampler)(prng *p);
 
+/*
+ * Compute NTT on a ring element.
+ */
+void Zf(mq_NTT)(uint16_t *a, unsigned logn);
+
+/*
+ * Compute the inverse NTT on a ring element.
+ */
+void Zf(mq_iNTT)(uint16_t *a, unsigned logn);
+
+/*
+ * Multiply two ring elements in NTT representation, and using a
+ * Montgomery multiplication. The result f*g is written over f.
+ */
+void Zf(mq_poly_montymul_ntt)(uint16_t *f, const uint16_t *g, unsigned logn);
+
+/*
+ * Subtract polynomial g from polynomial f, modulo q. Result f-g is
+ * written over f. Operands must be in the 0..q-1 range, as is the
+ * result.
+ */
+void Zf(mq_poly_sub)(uint16_t *f, const uint16_t *g, unsigned logn);
+
+/*
+ * Subtraction modulo q. Operands must be in the 0..q-1 range, as is
+ * the result.
+ */
+uint32_t Zf(mq_sub)(uint32_t x, uint32_t y);
+
 /* ==================================================================== */
 
 #endif
