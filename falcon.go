@@ -52,6 +52,8 @@ const (
 	CTSignatureSize = C.FALCON_DET1024_SIG_CT_SIZE
 	// SignatureMaxSize is the max possible size in bytes of a Falcon signature in compressed format.
 	SignatureMaxSize = C.FALCON_DET1024_SIG_COMPRESSED_MAXSIZE
+	// N=1024 is the degree of Falcon det1024 polynomials.
+	N = 1 << C.FALCON_DET1024_LOGN
 )
 
 // PublicKey represents a falcon public key
@@ -179,9 +181,6 @@ func (sig CompressedSignature) SaltVersion() byte {
 func (sig *CTSignature) SaltVersion() byte {
 	return sig[1]
 }
-
-// N=1024 is the degree of Falcon det1024 polynomials.
-const N = 1 << C.FALCON_DET1024_LOGN
 
 // Coefficients unpacks a public key representing a ring element h to its vector
 // of polynomial coefficients, i.e.,
