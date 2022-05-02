@@ -188,8 +188,8 @@ func (sig *CTSignature) SaltVersion() byte {
 // h(x) = h[0] + h[1] * x + h[2] * x^2 + ... + h[1023] * x^1023.
 //
 // Returns an error if pubkey is invalid.
-func (pub PublicKey) Coefficients() (h [N]uint16, err error) {
-	r := C.falcon_det1024_pubkey_coeffs((*C.uint16_t)(&h[0]), unsafe.Pointer(&pub[0]))
+func (pub *PublicKey) Coefficients() (h [N]uint16, err error) {
+	r := C.falcon_det1024_pubkey_coeffs((*C.uint16_t)(&h[0]), unsafe.Pointer(pub))
 	if r != 0 {
 		err = fmt.Errorf("falcon_det1024_pubkey_coeffs failed: %d", r)
 	}
@@ -200,8 +200,8 @@ func (pub PublicKey) Coefficients() (h [N]uint16, err error) {
 // coefficients of the associated ring element s_2. See Section 3.10 of the
 // Falcon specification for details. Returns an error if sig cannot be properly
 // unpacked.
-func (sig CTSignature) S2Coefficients() (s2 [N]int16, err error) {
-	r := C.falcon_det1024_s2_coeffs((*C.int16_t)(&s2[0]), unsafe.Pointer(&sig[0]))
+func (sig *CTSignature) S2Coefficients() (s2 [N]int16, err error) {
+	r := C.falcon_det1024_s2_coeffs((*C.int16_t)(&s2[0]), unsafe.Pointer(sig))
 	if r != 0 {
 		err = fmt.Errorf("falcon_det1024_s2_coeffs failed: %d", r)
 	}
