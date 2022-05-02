@@ -38,6 +38,10 @@ var (
 	ErrSignFail    = errors.New("falcon sign failed")
 	ErrVerifyFail  = errors.New("falcon verify failed")
 	ErrConvertFail = errors.New("falcon convert to CT failed")
+
+	ErrPubkeyCoefficientsFail = errors.New("falcon pubkey coefficients failed")
+	ErrS1CoefficientsFail     = errors.New("falcon computing S1 coefficients failed")
+	ErrS2CoefficientsFail     = errors.New("falcon computing S2 coefficients failed")
 )
 
 const (
@@ -191,7 +195,7 @@ func (sig *CTSignature) SaltVersion() byte {
 func (pub *PublicKey) Coefficients() (h [N]uint16, err error) {
 	r := C.falcon_det1024_pubkey_coeffs((*C.uint16_t)(&h[0]), unsafe.Pointer(pub))
 	if r != 0 {
-		err = fmt.Errorf("falcon_det1024_pubkey_coeffs failed: %d", r)
+		err = fmt.Errorf("error code %d: %w", int(r), ErrPubkeyCoefficientsFail)
 	}
 	return
 }
@@ -203,7 +207,7 @@ func (pub *PublicKey) Coefficients() (h [N]uint16, err error) {
 func (sig *CTSignature) S2Coefficients() (s2 [N]int16, err error) {
 	r := C.falcon_det1024_s2_coeffs((*C.int16_t)(&s2[0]), unsafe.Pointer(sig))
 	if r != 0 {
-		err = fmt.Errorf("falcon_det1024_s2_coeffs failed: %d", r)
+		err = fmt.Errorf("error code %d: %w", int(r), ErrS2CoefficientsFail)
 	}
 	return
 }
@@ -217,7 +221,7 @@ func (sig *CTSignature) S2Coefficients() (s2 [N]int16, err error) {
 func S1Coefficients(h [N]uint16, c [N]uint16, s2 [N]int16) (s1 [N]int16, err error) {
 	r := C.falcon_det1024_s1_coeffs((*C.int16_t)(&s1[0]), (*C.uint16_t)(&h[0]), (*C.uint16_t)(&c[0]), (*C.int16_t)(&s2[0]))
 	if r != 0 {
-		err = fmt.Errorf("falcon_det1024_s1_coeffs failed: %d", r)
+		err = fmt.Errorf("error code %d: %w", int(r), ErrS1CoefficientsFail)
 	}
 	return
 }
