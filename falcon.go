@@ -78,12 +78,11 @@ type CTSignature [CTSignatureSize]byte
 func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 	var rng C.shake256_context
 
-	seedLen := len(seed)
-	seedData := (*C.uchar)(C.NULL)
-	if seedLen > 0 {
-		seedData = (*C.uchar)(&seed[0])
+	if len(seed) == 0 {
+		C.shake256_init_prng_from_seed(&rng, C.NULL, 0)
+	} else {
+		C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(&seed[0]), C.size_t(len(seed)))
 	}
-	C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(seedData), C.size_t(seedLen))
 
 	publicKey := PublicKey{}
 	privateKey := PrivateKey{}
@@ -100,15 +99,14 @@ func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {
 // SignCompressed signs the message with privateKey and returns a compressed-format
 // signature, or an error if signing fails (e.g., due to a malformed private key).
 func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {
-	msgLen := len(msg)
-	cdata := (*C.uchar)(C.NULL)
-	if msgLen > 0 {
-		cdata = (*C.uchar)(&msg[0])
-	}
-
 	var sigLen C.size_t
 	var sig [SignatureMaxSize]byte
-	r := C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(cdata), C.size_t(msgLen))
+	var r C.int
+	if len(msg) == 0 {
+		r = C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), C.NULL, 0)
+	} else {
+		r = C.falcon_det1024_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(&msg[0]), C.size_t(len(msg)))
+	}
 	if r != 0 {
 		return nil, fmt.Errorf("error code %d: %w", int(r), ErrSignFail)
 	}
@@ -131,19 +129,16 @@ func (sig *CompressedSignature) ConvertToCT() (CTSignature, error) {
 // Verify reports whether sig is a valid compressed-format signature of msg under publicKey.
 // It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
-	msgLen := len(msg)
-	msgData := C.NULL
-	if msgLen > 0 {
-		msgData = unsafe.Pointer(&msg[0])
+	if len(signature) == 0 {
+		return fmt.Errorf("empty signature: %w", ErrVerifyFail)
 	}
 
-	sigLen := len(signature)
-	sigData := C.NULL
-	if sigLen > 0 {
-		sigData = unsafe.Pointer(&signature[0])
+	var r C.int
+	if len(msg) == 0 {
+		r = C.falcon_det1024_verify_compressed(unsafe.Pointer(&signature[0]), C.size_t(len(signature)), unsafe.Pointer(&(*pk)), C.NULL, 0)
+	} else {
+		r = C.falcon_det1024_verify_compressed(unsafe.Pointer(&signature[0]), C.size_t(len(signature)), unsafe.Pointer(&(*pk)), unsafe.Pointer(&msg[0]), C.size_t(len(msg)))
 	}
-
-	r := C.falcon_det1024_verify_compressed(sigData, C.size_t(sigLen), unsafe.Pointer(&(*pk)), msgData, C.size_t(msgLen))
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
@@ -156,11 +151,13 @@ func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {
 // VerifyCTSignature reports whether sig is a valid CT-format signature of msg under publicKey.
 // It outputs nil if so, and an error otherwise.
 func (pk *PublicKey) VerifyCTSignature(signature CTSignature, msg []byte) error {
-	data := C.NULL
-	if len(msg) > 0 {
-		data = unsafe.Pointer(&msg[0])
+	// TODO should signature be a pointer?
+	var r C.int
+	if len(msg) == 0 {
+		r = C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), C.NULL, 0)
+	} else {
+		r = C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), unsafe.Pointer(&msg[0]), C.size_t(len(msg)))
 	}
-	r := C.falcon_det1024_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), data, C.size_t(len(msg)))
 	if r != 0 {
 		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
 	}
@@ -193,7 +190,7 @@ func (sig *CTSignature) SaltVersion() byte {
 //
 // Returns an error if pubkey is invalid.
 func (pub *PublicKey) Coefficients() (h [N]uint16, err error) {
-	r := C.falcon_det1024_pubkey_coeffs((*C.uint16_t)(&h[0]), unsafe.Pointer(pub))
+	r := C.falcon_det1024_pubkey_coeffs((*C.uint16_t)(&h[0]), unsafe.Pointer(&(*pub)))
 	if r != 0 {
 		err = fmt.Errorf("error code %d: %w", int(r), ErrPubkeyCoefficientsFail)
 	}
@@ -205,7 +202,7 @@ func (pub *PublicKey) Coefficients() (h [N]uint16, err error) {
 // Falcon specification for details. Returns an error if sig cannot be properly
 // unpacked.
 func (sig *CTSignature) S2Coefficients() (s2 [N]int16, err error) {
-	r := C.falcon_det1024_s2_coeffs((*C.int16_t)(&s2[0]), unsafe.Pointer(sig))
+	r := C.falcon_det1024_s2_coeffs((*C.int16_t)(&s2[0]), unsafe.Pointer(&(*sig)))
 	if r != 0 {
 		err = fmt.Errorf("error code %d: %w", int(r), ErrS2CoefficientsFail)
 	}
@@ -232,10 +229,10 @@ func S1Coefficients(h [N]uint16, c [N]uint16, s2 [N]int16) (s1 [N]int16, err err
 // hashing, and Section 2.3.2-3 of the Deterministic Falcon specification for
 // the definition of the fixed salt.
 func HashToPointCoefficients(msg []byte, saltVersion byte) (c [N]uint16) {
-	data := C.NULL
-	if len(msg) > 0 {
-		data = unsafe.Pointer(&msg[0])
+	if len(msg) == 0 {
+		C.falcon_det1024_hash_to_point_coeffs((*C.uint16_t)(&c[0]), C.NULL, 0, C.uint8_t(saltVersion))
+	} else {
+		C.falcon_det1024_hash_to_point_coeffs((*C.uint16_t)(&c[0]), unsafe.Pointer(&msg[0]), C.size_t(len(msg)), C.uint8_t(saltVersion))
 	}
-	C.falcon_det1024_hash_to_point_coeffs((*C.uint16_t)(&c[0]), data, C.size_t(len(msg)), C.uint8_t(saltVersion))
 	return
 }
