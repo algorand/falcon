@@ -70,7 +70,10 @@ void test_inner(size_t data_len) {
 	uint8_t sig[FALCON_DET1024_SIG_COMPRESSED_MAXSIZE];
 	size_t sig_len;
 	uint8_t expected_sig[FALCON_DET1024_SIG_COMPRESSED_MAXSIZE];
-	uint8_t data[data_len];
+	// data_len is always below NUM_KATS; a fixed-size buffer avoids the
+	// zero-length variable-length array (undefined behavior in C) that
+	// the first KAT's data_len == 0 would otherwise declare.
+	uint8_t data[NUM_KATS];
 
 	memset(privkey, 0, FALCON_DET1024_PRIVKEY_SIZE);
 	memset(pubkey, 0, FALCON_DET1024_PUBKEY_SIZE);
