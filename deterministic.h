@@ -15,8 +15,8 @@ extern "C" {
 
 // Replace the 40 byte salt (nonce) with a single byte representing
 // the salt version:
-#define FALCON_DET1024_SIG_COMPRESSED_MAXSIZE FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET1024_LOGN)-40+1
-#define FALCON_DET1024_SIG_CT_SIZE FALCON_SIG_CT_SIZE(FALCON_DET1024_LOGN)-40+1
+#define FALCON_DET1024_SIG_COMPRESSED_MAXSIZE (FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET1024_LOGN)-40+1)
+#define FALCON_DET1024_SIG_CT_SIZE (FALCON_SIG_CT_SIZE(FALCON_DET1024_LOGN)-40+1)
 
 // The header bytes for deterministic mode correspond to the headers
 // for ordinary compressed/CT format, but with n=1024 and MSB=1:
@@ -181,8 +181,8 @@ int falcon_det1024_s1_coeffs(int16_t *s1, const uint16_t *h, const uint16_t *c, 
 
 // Replace the 40 byte salt (nonce) with a single byte representing
 // the salt version:
-#define FALCON_DET512_SIG_COMPRESSED_MAXSIZE FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET512_LOGN)-40+1
-#define FALCON_DET512_SIG_CT_SIZE FALCON_SIG_CT_SIZE(FALCON_DET512_LOGN)-40+1
+#define FALCON_DET512_SIG_COMPRESSED_MAXSIZE (FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET512_LOGN)-40+1)
+#define FALCON_DET512_SIG_CT_SIZE (FALCON_SIG_CT_SIZE(FALCON_DET512_LOGN)-40+1)
 
 // The header bytes for deterministic mode correspond to the headers
 // for ordinary compressed/CT format (0x30+logn and 0x50+logn), but
