@@ -108,10 +108,10 @@ codec.o: codec.c config.h inner.h fpr.h
 common.o: common.c config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o common.o common.c
 
-deterministic1024.o: deterministic1024.c deterministic.h falcon.h
+deterministic1024.o: deterministic1024.c deterministic.h falcon.h config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o deterministic1024.o deterministic1024.c
 
-deterministic512.o: deterministic512.c deterministic.h falcon.h
+deterministic512.o: deterministic512.c deterministic.h falcon.h config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o deterministic512.o deterministic512.c
 
 falcon.o: falcon.c falcon.h config.h inner.h fpr.h
