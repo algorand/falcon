@@ -115,7 +115,9 @@ int falcon_det1024_convert_compressed_to_ct(void *sig_ct,
 
 /*
  * Returns the salt version of a signature, in either compressed or CT
- * form.
+ * form. Only the second byte of sig (the salt-version byte common to
+ * both formats) is read, so sig must be at least 2 bytes long; the
+ * caller is responsible for checking this before calling.
  */
 int falcon_det1024_get_salt_version(const void* sig);
 
