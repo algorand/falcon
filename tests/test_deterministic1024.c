@@ -121,7 +121,7 @@ void test_inner(size_t data_len) {
 
 	int vct = falcon_det1024_get_salt_version(sigs_ct[data_len]);
 	if (vct != FALCON_DET1024_CURRENT_SALT_VERSION) {
-		fprintf(stderr, "unexpected salt version: %d", v);
+		fprintf(stderr, "unexpected salt version: %d", vct);
 		exit(EXIT_FAILURE);
 	}
 
