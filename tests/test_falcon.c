@@ -2561,7 +2561,6 @@ fpr_scaled(int64_t i, int sc)
 static inline fpr
 fpr_ldexp(fpr x, int e)
 {
-#if FALCON_FPEMU
 	uint32_t ex;
 
 	/*
@@ -2578,12 +2577,8 @@ fpr_ldexp(fpr x, int e)
 	x = (x & (((uint64_t)1 << 63) + ((uint64_t)1 << 52) - (uint64_t)1))
 		| ((uint64_t)ex << 52);
 	return x;
-#else
-	return FPR(ldexp(x.v, e));
-#endif
 }
 
-TARGET_AVX2
 static void
 test_FP_block(void)
 {
