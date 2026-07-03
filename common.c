@@ -47,15 +47,18 @@ Zf(hash_to_point_vartime)(
 	 * nonce, the hashed output cannot be matched against potential
 	 * plaintexts).
 	 */
-	size_t n;
+	uint8_t buf[128];
+	uint8_t offset = 128;
 
+	size_t n;
 	n = (size_t)1 << logn;
 	while (n > 0) {
-		uint8_t buf[2];
-		uint32_t w;
-
-		inner_shake256_extract(sc, (void *)buf, sizeof buf);
-		w = ((unsigned)buf[0] << 8) | (unsigned)buf[1];
+		if (offset >= 128) {
+			inner_shake256_extract(sc, (void *)buf, sizeof buf);
+			offset = 0;
+		}
+		uint32_t w = ((unsigned)buf[offset] << 8) | (unsigned)buf[offset + 1];
+		offset += 2;
 		if (w < 61445) {
 			while (w >= 12289) {
 				w -= 12289;
