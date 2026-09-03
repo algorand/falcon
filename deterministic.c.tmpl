@@ -218,6 +218,9 @@ int DET_FN(pubkey_coeffs)(uint16_t *h, const void *pubkey) {
 	/*
 	 * Decode public key.
 	 */
+	if (((uint8_t*)pubkey)[0] != DET_LOGN) {
+		return FALCON_ERR_FORMAT;
+	}
 	if (Zf(modq_decode)(h, DET_LOGN, (uint8_t*)pubkey + 1, DET_PUBKEY_SIZE - 1)
 		!= DET_PUBKEY_SIZE - 1)
 	{

@@ -176,6 +176,9 @@ int falcon_det512_pubkey_coeffs(uint16_t *h, const void *pubkey) {
 	/*
 	 * Decode public key.
 	 */
+	if (((uint8_t*)pubkey)[0] != FALCON_DET512_LOGN) {
+		return FALCON_ERR_FORMAT;
+	}
 	if (Zf(modq_decode)(h, FALCON_DET512_LOGN, (uint8_t*)pubkey + 1, FALCON_DET512_PUBKEY_SIZE - 1)
 		!= FALCON_DET512_PUBKEY_SIZE - 1)
 	{
