@@ -169,7 +169,8 @@ int falcon_det1024_s1_coeffs(int16_t *s1, const uint16_t *h, const uint16_t *c, 
 /*                                                                        */
 /* The det512 functions implement the same Deterministic Falcon algorithm */
 /* as det1024, with the Falcon parameter n=512 (logn=9) instead of n=1024 */
-/* (logn=10). Both function families are produced from the single         */
+/* (logn=10) and n=512 specific constants for key sizes, buffer sizes,    */
+/* and header bytes. Both function families are produced from the single  */
 /* deterministic.c.tmpl template; see the det1024 documentation above for */
 /* per-function semantics.                                                */
 /* ====================================================================== */

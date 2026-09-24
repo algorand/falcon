@@ -298,7 +298,7 @@ func TestSaltedVersions(t *testing.T) {
 	}
 }
 
-type PointerToPointerPanicGenerator struct {
+type Det1024PointerToPointerPanicGenerator struct {
 	seed  [32]byte
 	msg   [128]byte
 	sig   CompressedSignature
@@ -308,9 +308,9 @@ type PointerToPointerPanicGenerator struct {
 	p     *int
 }
 
-func TestPointerToPointer(t *testing.T) {
+func TestDet1024PointerToPointer(t *testing.T) {
 	r := 42
-	v := &PointerToPointerPanicGenerator{
+	v := &Det1024PointerToPointerPanicGenerator{
 		p: &r,
 	}
 	rand.Read(v.seed[:])
@@ -368,6 +368,78 @@ func TestPointerToPointer(t *testing.T) {
 	}
 	_ = HashToPointCoefficients(nil, 0)
 	_ = HashToPointCoefficients(v.msg[:], 0)
+}
+
+type Det512PointerToPointerPanicGenerator struct {
+	seed  [32]byte
+	msg   [128]byte
+	sig   Det512CompressedSignature
+	ctsig Det512CTSignature
+	pub   Det512PublicKey
+	priv  Det512PrivateKey
+	p     *int
+}
+
+func TestDet512PointerToPointer(t *testing.T) {
+	r := 42
+	v := &Det512PointerToPointerPanicGenerator{
+		p: &r,
+	}
+	rand.Read(v.seed[:])
+	rand.Read(v.msg[:])
+
+	var err error
+	v.pub, v.priv, err = Det512GenerateKey(v.seed[:])
+	if err != nil {
+		t.Fatalf("failed to generate keys: %s", err)
+	}
+	_, _, err = Det512GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate keys from empty seed: %s", err)
+	}
+
+	v.sig, err = v.priv.SignCompressed(v.msg[:])
+	if err != nil {
+		t.Fatalf("failed to sign message: %s", err)
+	}
+	if err := v.pub.Verify(v.sig, v.msg[:]); err != nil {
+		t.Fatalf("failed to verify sig: %s", err)
+	}
+
+	sig2, err := v.priv.SignCompressed(nil)
+	if err != nil {
+		t.Fatalf("failed to sign empty message. err message: %s", err)
+	}
+	if err := v.pub.Verify(sig2, nil); err != nil {
+		t.Fatalf("failed to verify sig on empty message: %s", err)
+	}
+
+	v.ctsig, err = v.sig.ConvertToCT()
+	if err != nil {
+		t.Fatalf("failed to convert signature: %s", err)
+	}
+	if err := v.pub.VerifyCTSignature(v.ctsig, v.msg[:]); err != nil {
+		t.Fatalf("failed to verify ct signature: %s", err)
+	}
+
+	ctSig2, err := sig2.ConvertToCT()
+	if err != nil {
+		t.Fatalf("failed to convert signature of empty message: %s", err)
+	}
+	if err := v.pub.VerifyCTSignature(ctSig2, nil); err != nil {
+		t.Fatalf("failed to verify ct signature of empty message: %s", err)
+	}
+
+	_, err = v.pub.Coefficients()
+	if err != nil {
+		t.Fatalf("failed to compute pubkey coefficients: %s", err)
+	}
+	_, err = v.ctsig.S2Coefficients()
+	if err != nil {
+		t.Fatalf("failed to compute s2 coefficients: %s", err)
+	}
+	_ = Det512HashToPointCoefficients(nil, 0)
+	_ = Det512HashToPointCoefficients(v.msg[:], 0)
 }
 
 func BenchmarkFalconKeyGen(b *testing.B) {
