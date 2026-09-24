@@ -1,0 +1,8 @@
+*.o
+
+# Test binaries built by the Makefile
+/tests/speed
+/tests/test_det_generic
+/tests/test_deterministic1024
+/tests/test_deterministic512
+/tests/test_falcon
