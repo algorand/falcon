@@ -79,10 +79,10 @@
  * for the same message (under the same secret key).
  *
  * Determinism can be sanity-checked (but not guaranteed) using the
- * provided KATs, via test_deterministic. Any deviation from the
- * expected results indicates a lack of the desired determinism;
- * however, agreement does not prove determinism for all possible
- * inputs.
+ * provided KATs, via test_deterministic1024 and test_deterministic512.
+ * Any deviation from the expected results indicates a lack of the
+ * desired determinism; however, agreement does not prove determinism
+ * for all possible inputs.
  */
 #define FALCON_FPEMU  1
 

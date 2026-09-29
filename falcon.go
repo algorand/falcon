@@ -239,3 +239,206 @@ func HashToPointCoefficients(msg []byte, saltVersion byte) (c [N]uint16) {
 	}
 	return
 }
+
+// ============================================================================
+// FALCON-DET512 (n=512) bindings.
+//
+// The same algorithm as the default (det1024) API above, with Falcon parameter
+// n=512 instead of n=1024. Exposed as a parallel set of Det512-prefixed types
+// and functions so the existing unprefixed (det1024) API remains unchanged.
+// ============================================================================
+
+const (
+	// Det512PublicKeySize is the size of a Falcon-Det512 public key.
+	Det512PublicKeySize = C.FALCON_DET512_PUBKEY_SIZE
+	// Det512PrivateKeySize is the size of a Falcon-Det512 private key.
+	Det512PrivateKeySize = C.FALCON_DET512_PRIVKEY_SIZE
+	// Det512CurrentSaltVersion is the salt version used to compute Det512 signatures.
+	Det512CurrentSaltVersion = C.FALCON_DET512_CURRENT_SALT_VERSION
+	// Det512CTSignatureSize is the size in bytes of a Falcon-Det512 signature in CT format.
+	Det512CTSignatureSize = C.FALCON_DET512_SIG_CT_SIZE
+	// Det512SignatureMaxSize is the max possible size in bytes of a Falcon-Det512 signature in compressed format.
+	Det512SignatureMaxSize = C.FALCON_DET512_SIG_COMPRESSED_MAXSIZE
+	// Det512N=512 is the degree of Falcon-Det512 polynomials.
+	Det512N = 1 << C.FALCON_DET512_LOGN
+)
+
+// Det512PublicKey represents a Falcon-Det512 public key.
+type Det512PublicKey [Det512PublicKeySize]byte
+
+// Det512PrivateKey represents a Falcon-Det512 private key.
+type Det512PrivateKey [Det512PrivateKeySize]byte
+
+// Det512CompressedSignature is a Falcon-Det512 signature in compressed
+// format, which is variable-length.
+type Det512CompressedSignature []byte
+
+// Det512CTSignature is a Falcon-Det512 signature in constant-time format,
+// which is fixed-length.
+type Det512CTSignature [Det512CTSignatureSize]byte
+
+// Det512GenerateKey generates a Falcon-Det512 public/private key pair from the given seed.
+func Det512GenerateKey(seed []byte) (Det512PublicKey, Det512PrivateKey, error) {
+	var rng C.shake256_context
+
+	if len(seed) == 0 {
+		C.shake256_init_prng_from_seed(&rng, C.NULL, 0)
+	} else {
+		C.shake256_init_prng_from_seed(&rng, unsafe.Pointer(&seed[0]), C.size_t(len(seed)))
+	}
+
+	publicKey := Det512PublicKey{}
+	privateKey := Det512PrivateKey{}
+
+	r := C.falcon_det512_keygen(&rng, unsafe.Pointer(&privateKey[0]), unsafe.Pointer(&publicKey[0]))
+	if r != 0 {
+		return Det512PublicKey{}, Det512PrivateKey{}, fmt.Errorf("error code is %d: %w", int(r), ErrKeygenFail)
+	}
+
+	runtime.KeepAlive(seed)
+	return publicKey, privateKey, nil
+}
+
+// SignCompressed signs the message with privateKey and returns a compressed-format
+// signature, or an error if signing fails (e.g., due to a malformed private key).
+func (sk *Det512PrivateKey) SignCompressed(msg []byte) (Det512CompressedSignature, error) {
+	var sigLen C.size_t
+	var sig [Det512SignatureMaxSize]byte
+	var r C.int
+	if len(msg) == 0 {
+		r = C.falcon_det512_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), C.NULL, 0)
+	} else {
+		r = C.falcon_det512_sign_compressed(unsafe.Pointer(&sig[0]), &sigLen, unsafe.Pointer(&(*sk)), unsafe.Pointer(&msg[0]), C.size_t(len(msg)))
+	}
+	if r != 0 {
+		return nil, fmt.Errorf("error code %d: %w", int(r), ErrSignFail)
+	}
+
+	runtime.KeepAlive(msg)
+	return sig[:sigLen], nil
+}
+
+// ConvertToCT converts a compressed-format signature to a CT-format signature.
+func (sig *Det512CompressedSignature) ConvertToCT() (Det512CTSignature, error) {
+	sigCT := Det512CTSignature{}
+
+	if len(*sig) < 2 {
+		return Det512CTSignature{}, fmt.Errorf("signature too short: %w", ErrConvertFail)
+	}
+
+	r := C.falcon_det512_convert_compressed_to_ct(unsafe.Pointer(&sigCT[0]), unsafe.Pointer(&(*sig)[0]), C.size_t(len(*sig)))
+	if r != 0 {
+		return Det512CTSignature{}, fmt.Errorf("error code %d: %w", int(r), ErrConvertFail)
+	}
+	return sigCT, nil
+}
+
+// Verify reports whether sig is a valid compressed-format signature of msg under publicKey.
+// It outputs nil if so, and an error otherwise.
+func (pk *Det512PublicKey) Verify(signature Det512CompressedSignature, msg []byte) error {
+	if len(signature) == 0 {
+		return fmt.Errorf("empty signature: %w", ErrVerifyFail)
+	}
+
+	var r C.int
+	if len(msg) == 0 {
+		r = C.falcon_det512_verify_compressed(unsafe.Pointer(&signature[0]), C.size_t(len(signature)), unsafe.Pointer(&(*pk)), C.NULL, 0)
+	} else {
+		r = C.falcon_det512_verify_compressed(unsafe.Pointer(&signature[0]), C.size_t(len(signature)), unsafe.Pointer(&(*pk)), unsafe.Pointer(&msg[0]), C.size_t(len(msg)))
+	}
+	if r != 0 {
+		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
+	}
+
+	runtime.KeepAlive(msg)
+	runtime.KeepAlive(signature)
+	return nil
+}
+
+// VerifyCTSignature reports whether sig is a valid CT-format signature of msg under publicKey.
+// It outputs nil if so, and an error otherwise.
+func (pk *Det512PublicKey) VerifyCTSignature(signature Det512CTSignature, msg []byte) error {
+	var r C.int
+	if len(msg) == 0 {
+		r = C.falcon_det512_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), C.NULL, 0)
+	} else {
+		r = C.falcon_det512_verify_ct(unsafe.Pointer(&signature[0]), unsafe.Pointer(&(*pk)), unsafe.Pointer(&msg[0]), C.size_t(len(msg)))
+	}
+	if r != 0 {
+		return fmt.Errorf("error code %d: %w", int(r), ErrVerifyFail)
+	}
+
+	runtime.KeepAlive(msg)
+	runtime.KeepAlive(signature)
+	return nil
+}
+
+// SaltVersion returns the salt version used in a compressed-format signature.
+// By definition, the default salt version is 0, if the signature is too short to specify one.
+// (Such a signature is malformed, and would not pass verification, but is still considered to have a salt version.)
+func (sig Det512CompressedSignature) SaltVersion() byte {
+	if len(sig) < 2 {
+		return 0
+	}
+	return sig[1]
+}
+
+// SaltVersion returns the salt version used in a CT-format signature.
+// (It panics if the receiver pointer is nil.)
+func (sig *Det512CTSignature) SaltVersion() byte {
+	return sig[1]
+}
+
+// Coefficients unpacks a public key representing a ring element h to its vector
+// of polynomial coefficients, i.e.,
+//
+// h(x) = h[0] + h[1] * x + h[2] * x^2 + ... + h[511] * x^511.
+//
+// Returns an error if pubkey is invalid.
+func (pub *Det512PublicKey) Coefficients() (h [Det512N]uint16, err error) {
+	r := C.falcon_det512_pubkey_coeffs((*C.uint16_t)(&h[0]), unsafe.Pointer(&(*pub)))
+	if r != 0 {
+		err = fmt.Errorf("error code %d: %w", int(r), ErrPubkeyCoefficientsFail)
+	}
+	return
+}
+
+// S2Coefficients unpacks a signature in CT format to the vector of polynomial
+// coefficients of the associated ring element s_2. See Section 3.10 of the
+// Falcon specification for details. Returns an error if sig cannot be properly
+// unpacked.
+func (sig *Det512CTSignature) S2Coefficients() (s2 [Det512N]int16, err error) {
+	r := C.falcon_det512_s2_coeffs((*C.int16_t)(&s2[0]), unsafe.Pointer(&(*sig)))
+	if r != 0 {
+		err = fmt.Errorf("error code %d: %w", int(r), ErrS2CoefficientsFail)
+	}
+	return
+}
+
+// Det512S1Coefficients computes the vector of polynomial coefficients of
+// s_1 = c - s_2 * h, given the unpacked values h, c, and s_2.
+// See Section 3.10 of the Falcon specification for details. Returns an error if
+// the aggregate (s_1,s_2) vector is not short enough to constitute a valid
+// signature (for the public key corresponding to h, the hash digest
+// corresponding to c, and the signature corresponding to s_2).
+func Det512S1Coefficients(h [Det512N]uint16, c [Det512N]uint16, s2 [Det512N]int16) (s1 [Det512N]int16, err error) {
+	r := C.falcon_det512_s1_coeffs((*C.int16_t)(&s1[0]), (*C.uint16_t)(&h[0]), (*C.uint16_t)(&c[0]), (*C.int16_t)(&s2[0]))
+	if r != 0 {
+		err = fmt.Errorf("error code %d: %w", int(r), ErrS1CoefficientsFail)
+	}
+	return
+}
+
+// Det512HashToPointCoefficients hashes msg using the fixed 40-byte salt specified
+// by saltVersion, to a ring element c, represented by its vector of polynomial
+// coefficients. See Section 3.7 of the Falcon specification for the details of the
+// hashing, and Section 2.3.2-3 of the Deterministic Falcon specification for
+// the definition of the fixed salt.
+func Det512HashToPointCoefficients(msg []byte, saltVersion byte) (c [Det512N]uint16) {
+	if len(msg) == 0 {
+		C.falcon_det512_hash_to_point_coeffs((*C.uint16_t)(&c[0]), C.NULL, 0, C.uint8_t(saltVersion))
+	} else {
+		C.falcon_det512_hash_to_point_coeffs((*C.uint16_t)(&c[0]), unsafe.Pointer(&msg[0]), C.size_t(len(msg)), C.uint8_t(saltVersion))
+	}
+	return
+}
