@@ -176,6 +176,9 @@ int falcon_det512_pubkey_coeffs(uint16_t *h, const void *pubkey) {
 	/*
 	 * Decode public key.
 	 */
+	if (((uint8_t*)pubkey)[0] != FALCON_DET512_LOGN) {
+		return FALCON_ERR_FORMAT;
+	}
 	if (Zf(modq_decode)(h, FALCON_DET512_LOGN, (uint8_t*)pubkey + 1, FALCON_DET512_PUBKEY_SIZE - 1)
 		!= FALCON_DET512_PUBKEY_SIZE - 1)
 	{
@@ -194,8 +197,10 @@ void falcon_det512_hash_to_point_coeffs(uint16_t *c, const void *data, size_t da
 	shake256_inject(&ctx, data, data_len);
 	shake256_flip(&ctx);
 
-	uint8_t tmp[(1<<FALCON_DET512_LOGN)*2];
-	Zf(hash_to_point_ct)((inner_shake256_context *)&ctx, c, FALCON_DET512_LOGN, tmp);
+	// hash_to_point_ct requires its temporary buffer (2*2^logn bytes)
+	// to have 16-bit alignment, so declare it as uint16_t.
+	uint16_t tmp[1<<FALCON_DET512_LOGN];
+	Zf(hash_to_point_ct)((inner_shake256_context *)&ctx, c, FALCON_DET512_LOGN, (uint8_t *)tmp);
 }
 
 int falcon_det512_s2_coeffs(int16_t *s2, const void* sig) {

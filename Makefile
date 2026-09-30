@@ -51,12 +51,12 @@ LIBS = #-lm
 
 # =====================================================================
 
-OBJ = codec.o common.o deterministic1024.o deterministic512.o falcon.o fft.o fpr.o keygen.o rng.o shake.o sign.o vrfy.o
+OBJ = codec.o common.o falcon.o fft.o fpr.o keygen.o rng.o shake.o sign.o vrfy.o
 
 all: tests/test_deterministic1024 tests/test_deterministic512 tests/test_det_generic tests/test_falcon tests/speed
 
 clean:
-	-rm -f $(OBJ) tests/test_deterministic1024 tests/test_deterministic1024.o tests/test_deterministic512 tests/test_deterministic512.o tests/test_det_generic tests/test_det_generic.o tests/test_falcon tests/test_falcon.o tests/speed tests/speed.o
+	-rm -f $(OBJ) deterministic1024.o deterministic512.o tests/test_deterministic1024 tests/test_deterministic1024.o tests/test_deterministic512 tests/test_deterministic512.o tests/test_det_generic tests/test_det_generic.o tests/test_falcon tests/test_falcon.o tests/speed tests/speed.o
 
 # The deterministic<n>.c sources are generated from the single template
 # deterministic.c.tmpl and committed to the repository, so a normal build just
@@ -87,14 +87,14 @@ deterministic1024.c: deterministic.c.tmpl
 deterministic512.c: deterministic.c.tmpl
 	sh scripts/gen_deterministic.sh "$(CC)" . 512
 
-tests/test_deterministic1024: tests/test_deterministic1024.o $(OBJ)
-	$(LD) $(LDFLAGS) -o tests/test_deterministic1024 tests/test_deterministic1024.o $(OBJ) $(LIBS)
+tests/test_deterministic1024: tests/test_deterministic1024.o $(OBJ) deterministic1024.o
+	$(LD) $(LDFLAGS) -o tests/test_deterministic1024 tests/test_deterministic1024.o $(OBJ) deterministic1024.o $(LIBS)
 
-tests/test_deterministic512: tests/test_deterministic512.o $(OBJ)
-	$(LD) $(LDFLAGS) -o tests/test_deterministic512 tests/test_deterministic512.o $(OBJ) $(LIBS)
+tests/test_deterministic512: tests/test_deterministic512.o $(OBJ) deterministic512.o
+	$(LD) $(LDFLAGS) -o tests/test_deterministic512 tests/test_deterministic512.o $(OBJ) deterministic512.o $(LIBS)
 
-tests/test_det_generic: tests/test_det_generic.o $(OBJ)
-	$(LD) $(LDFLAGS) -o tests/test_det_generic tests/test_det_generic.o $(OBJ) $(LIBS)
+tests/test_det_generic: tests/test_det_generic.o $(OBJ) deterministic1024.o deterministic512.o
+	$(LD) $(LDFLAGS) -o tests/test_det_generic tests/test_det_generic.o $(OBJ) deterministic1024.o deterministic512.o $(LIBS)
 
 tests/test_falcon: tests/test_falcon.o $(OBJ)
 	$(LD) $(LDFLAGS) -o tests/test_falcon tests/test_falcon.o $(OBJ) $(LIBS)
@@ -108,10 +108,10 @@ codec.o: codec.c config.h inner.h fpr.h
 common.o: common.c config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o common.o common.c
 
-deterministic1024.o: deterministic1024.c deterministic.h falcon.h
+deterministic1024.o: deterministic1024.c deterministic.h falcon.h config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o deterministic1024.o deterministic1024.c
 
-deterministic512.o: deterministic512.c deterministic.h falcon.h
+deterministic512.o: deterministic512.c deterministic.h falcon.h config.h inner.h fpr.h
 	$(CC) $(CFLAGS) -c -o deterministic512.o deterministic512.c
 
 falcon.o: falcon.c falcon.h config.h inner.h fpr.h

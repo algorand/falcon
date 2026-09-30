@@ -15,8 +15,8 @@ extern "C" {
 
 // Replace the 40 byte salt (nonce) with a single byte representing
 // the salt version:
-#define FALCON_DET1024_SIG_COMPRESSED_MAXSIZE FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET1024_LOGN)-40+1
-#define FALCON_DET1024_SIG_CT_SIZE FALCON_SIG_CT_SIZE(FALCON_DET1024_LOGN)-40+1
+#define FALCON_DET1024_SIG_COMPRESSED_MAXSIZE (FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET1024_LOGN)-40+1)
+#define FALCON_DET1024_SIG_CT_SIZE (FALCON_SIG_CT_SIZE(FALCON_DET1024_LOGN)-40+1)
 
 // The header bytes for deterministic mode correspond to the headers
 // for ordinary compressed/CT format, but with n=1024 and MSB=1:
@@ -115,7 +115,9 @@ int falcon_det1024_convert_compressed_to_ct(void *sig_ct,
 
 /*
  * Returns the salt version of a signature, in either compressed or CT
- * form.
+ * form. Only the second byte of sig (the salt-version byte common to
+ * both formats) is read, so sig must be at least 2 bytes long; the
+ * caller is responsible for checking this before calling.
  */
 int falcon_det1024_get_salt_version(const void* sig);
 
@@ -181,8 +183,8 @@ int falcon_det1024_s1_coeffs(int16_t *s1, const uint16_t *h, const uint16_t *c, 
 
 // Replace the 40 byte salt (nonce) with a single byte representing
 // the salt version:
-#define FALCON_DET512_SIG_COMPRESSED_MAXSIZE FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET512_LOGN)-40+1
-#define FALCON_DET512_SIG_CT_SIZE FALCON_SIG_CT_SIZE(FALCON_DET512_LOGN)-40+1
+#define FALCON_DET512_SIG_COMPRESSED_MAXSIZE (FALCON_SIG_COMPRESSED_MAXSIZE(FALCON_DET512_LOGN)-40+1)
+#define FALCON_DET512_SIG_CT_SIZE (FALCON_SIG_CT_SIZE(FALCON_DET512_LOGN)-40+1)
 
 // The header bytes for deterministic mode correspond to the headers
 // for ordinary compressed/CT format (0x30+logn and 0x50+logn), but

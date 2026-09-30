@@ -44,6 +44,16 @@ var (
 	ErrS2CoefficientsFail     = errors.New("falcon computing S2 coefficients failed")
 )
 
+// NOTE: the cgo calls below deliberately spell out the empty-slice check
+// and the unsafe.Pointer(&b[0]) expression at every call site rather than
+// sharing a helper. cgo enforces its pointer-passing rules against the
+// syntactic form of the call arguments: an inline &b[0] is checked against
+// just the slice's backing array, whereas the same pointer returned from a
+// helper is resolved at runtime to its entire containing allocation, and
+// panics with "cgo argument has Go pointer to unpinned Go pointer" when
+// the slice aliases memory in a struct that also holds Go pointers.
+// TestPointerToPointer and TestDet512PointerToPointer exercise that case.
+
 const (
 	// PublicKeySize is the size of a Falcon public key.
 	PublicKeySize = C.FALCON_DET1024_PUBKEY_SIZE
