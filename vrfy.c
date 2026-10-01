@@ -498,9 +498,39 @@ mq_div_12289(uint32_t x, uint32_t y)
 	return mq_montymul(y18, x);
 }
 
+
+
+#if FALCON_AVX2
+
+#define VEC __m256i
+#define VER(name) mq_8x_##name
+#define ADD(a, b)   _mm256_add_epi32((a), (b))
+#define AND(a, b)   _mm256_and_si256((a), (b))
+#define MUL(a, b)   _mm256_mullo_epi32((a), (b))
+#define NEG(a)      _mm256_sub_epi32(_mm256_setzero_si256(), (a))
+#define SHR(a, imm) _mm256_srli_epi32((a), (imm))
+#define SPLAT(a)    _mm256_set1_epi32((a))
+#define SUB(a, b)   _mm256_sub_epi32((a), (b))
+#include "vrfy_simd.h"
+
+#define VEC __m128i
+#define VER(name) mq_4x_##name
+#define ADD(a, b)   _mm_add_epi32((a), (b))
+#define AND(a, b)   _mm_and_si128((a), (b))
+#define MUL(a, b)   _mm_mullo_epi32((a), (b))
+#define NEG(a)      _mm_sub_epi32(_mm_setzero_si128(), (a))
+#define SHR(a, imm) _mm_srli_epi32((a), (imm))
+#define SPLAT(a)    _mm_set1_epi32((a))
+#define SUB(a, b)   _mm_sub_epi32((a), (b))
+#include "vrfy_simd.h"
+
+#endif
+
+
 /*
  * Compute NTT on a ring element.
  */
+TARGET_AVX2
 static void
 mq_NTT(uint16_t *a, unsigned logn)
 {
@@ -513,9 +543,71 @@ mq_NTT(uint16_t *a, unsigned logn)
 
 		ht = t >> 1;
 		for (i = 0, j1 = 0; i < m; i ++, j1 += t) {
-			size_t j, j2;
-			uint32_t s;
+			size_t j;
+			
+#if FALCON_AVX2
+			switch (ht) {
+				case 8: {
+					/* Load 8 16-bit field elements from our two sources. */
+					__m128i t0  = _mm_loadu_si128((__m128i*)&a[j1]);
+					__m128i t1  = _mm_loadu_si128((__m128i*)&a[j1 + ht]);
+					/* Extend each 16-bit element to 32-bits to perform the multiplications. */
+					__m256i u_0 = _mm256_cvtepu16_epi32(t0);
+					__m256i u_1 = _mm256_cvtepu16_epi32(t1);
+					
+					/* We're able to reuse the omega across the whole butterfly loop. */
+					__m256i s = _mm256_set1_epi32(GMb[m + i]);
+					
+					/* V = a[j+t] * S */
+					__m256i v  = mq_8x_montymul(u_1, s);
+					/* a[j] = U + V mod q */
+					__m256i r0 = mq_8x_add(u_0, v);
+					/* a[j+t] = U - V mod q */
+					__m256i r1 = mq_8x_sub(u_0, v);
+					
+					/* 
+						r0 and r1 contain 8 32-bit elements, where each element is reduced to 16-bits.
+						our goal is to shuffle around the elements so that we combine them and end
+						up with a single register containing 16, 16-bit elements, where the first 8
+						are from the r0 and the second are from r1.
+					*/
+					__m256i result = _mm256_permute4x64_epi64(
+						_mm256_packus_epi32(r0, r1),
+						0xD8
+					);
+					_mm256_storeu_si256((__m256i*)&a[j1], result);
+					continue;
+				}
+				case 4: {
+					/* Sets the first 4 elements of each vector, keeping the rest undefined. */
+					__m128i t0 = _mm_loadl_epi64((__m128i*)&a[j1]);
+					__m128i t1 = _mm_loadl_epi64((__m128i*)&a[j1 + ht]);
+					
+					/* Extend each 16-bit element to 32-bits to perform the multiplications. */
+					__m128i u_0 = _mm_cvtepu16_epi32(t0);
+					__m128i u_1 = _mm_cvtepu16_epi32(t1);
+					
+					/* We're able to reuse the omega across the whole butterfly loop. */
+					__m128i s = _mm_set1_epi32(GMb[m + i]);
+					
+					/* V = a[j+t] * S */
+					__m128i v  = mq_4x_montymul(u_1, s);
+					/* a[j] = U + V mod q */
+					__m128i r0 = mq_4x_add(u_0, v);
+					/* a[j+t] = U - V mod q */
+					__m128i r1 = mq_4x_sub(u_0, v);
 
+					__m128i zero = _mm_setzero_si128();
+					__m128i lo = _mm_blend_epi16(r1, zero, 0xAA);
+					__m128i hi = _mm_blend_epi16(r0, zero, 0xAA);
+					__m128i result = _mm_packus_epi32(hi, lo);
+					_mm_storeu_si128((__m128i*)&a[j1], result);
+					continue;
+				}
+				default: {}
+			}
+#endif
+			uint32_t s, j2;
 			s = GMb[m + i];
 			j2 = j1 + ht;
 			for (j = j1; j < j2; j ++) {
@@ -534,6 +626,7 @@ mq_NTT(uint16_t *a, unsigned logn)
 /*
  * Compute the inverse NTT on a ring element, binary case.
  */
+TARGET_AVX2
 static void
 mq_iNTT(uint16_t *a, unsigned logn)
 {
@@ -549,9 +642,61 @@ mq_iNTT(uint16_t *a, unsigned logn)
 		hm = m >> 1;
 		dt = t << 1;
 		for (i = 0, j1 = 0; i < hm; i ++, j1 += dt) {
-			size_t j, j2;
-			uint32_t s;
+			size_t j;
 
+#if FALCON_AVX2
+			switch (t) {
+				case 8: {
+					/* Load 8 16-bit field elements from our two sources. */
+					__m128i t0  = _mm_loadu_si128((__m128i*)&a[j1]);
+					__m128i t1  = _mm_loadu_si128((__m128i*)&a[j1 + t]);
+					/* Extend each 16-bit element to 32-bits to perform the multiplications. */
+					__m256i u = _mm256_cvtepu16_epi32(t0);
+					__m256i v = _mm256_cvtepu16_epi32(t1);
+					
+					/* We're able to reuse the omega across the whole butterfly loop. */
+					__m256i s = _mm256_set1_epi32(iGMb[hm + i]);
+					
+					/* a[j] = U + V mod q */
+					__m256i r0  = mq_8x_add(u, v);
+					/* a[j+t] = (U - V) * S mod q */
+					__m256i r1 = mq_8x_montymul(mq_8x_sub(u, v), s);
+					
+					__m256i result = _mm256_permute4x64_epi64(
+						_mm256_packus_epi32(r0, r1),
+						0xD8
+					);
+					_mm256_storeu_si256((__m256i*)&a[j1], result);
+					continue;
+				}
+				case 4: {
+					/* Sets the first 4 elements of each vector, keeping the rest undefined. */
+					__m128i t0 = _mm_loadl_epi64((__m128i*)&a[j1]);
+					__m128i t1 = _mm_loadl_epi64((__m128i*)&a[j1 + t]);
+					/* Extend each 16-bit element to 32-bits to perform the multiplications. */
+					__m128i u = _mm_cvtepu16_epi32(t0);
+					__m128i v = _mm_cvtepu16_epi32(t1);
+					
+					/* We're able to reuse the omega across the whole butterfly loop. */
+					__m128i s = _mm_set1_epi32(iGMb[hm + i]);
+					
+					/* a[j] = U + V mod q */
+					__m128i r0  = mq_4x_add(u, v);
+					/* a[j+t] = (U - V) * S mod q */
+					__m128i r1 = mq_4x_montymul(mq_4x_sub(u, v), s);
+
+					__m128i zero = _mm_setzero_si128();
+					__m128i lo = _mm_blend_epi16(r1, zero, 0xAA);
+					__m128i hi = _mm_blend_epi16(r0, zero, 0xAA);
+					__m128i result = _mm_packus_epi32(hi, lo);
+					_mm_storeu_si128((__m128i*)&a[j1], result);
+					continue;
+				}
+				default: {}
+			}
+#endif
+
+			uint32_t s, j2;
 			j2 = j1 + t;
 			s = iGMb[hm + i];
 			for (j = j1; j < j2; j ++) {

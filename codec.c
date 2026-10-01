@@ -72,7 +72,16 @@ Zf(modq_encode)(
 	return out_len;
 }
 
+#if FALCON_AVX2
+static inline uint32_t load4(const uint8_t *buf) {
+	uint32_t r;
+	memcpy(&r, buf, 4);
+	return r;
+}
+#endif
+
 /* see inner.h */
+TARGET_AVX2
 size_t
 Zf(modq_decode)(
 	uint16_t *x, unsigned logn,
@@ -88,10 +97,113 @@ Zf(modq_decode)(
 	if (in_len > max_in_len) {
 		return 0;
 	}
+
+	u = 0;
 	buf = in;
+#if FALCON_AVX2 // yyyAVX2+1
+	if (logn >= 3) { // We need at least 8 elements to decode at a time.
+		const __m256i mask     = _mm256_set1_epi32((1 << 14) - 1);
+		const __m256i Q 	   = _mm256_set1_epi32(12289);
+		const __m256i offsets  = _mm256_setr_epi32(18,4,14,0, 18,4,14,0);
+		/* Mask that byteswaps each 32-bit element of the __m256i */
+		const __m256i bytemask = _mm256_setr_epi8(
+			3,  2,  1,  0,
+			7,  6,  5,  4,
+			11, 10,  9,  8,
+			15, 14, 13, 12,
+			3,  2,  1,  0,
+			7,  6,  5,  4,
+			11, 10,  9,  8,
+			15, 14, 13, 12
+		);
+
+		uint16_t *out;
+		out = x;
+		/* 
+			The size of the polynomial in the encoded polynomial in bytes 
+			is given by (14 * (1 << logn) / 8). The encoded form represents
+			(1 << logn) polynomial coefficients, bit-packed as 14-bits each.
+
+			The least-common-multiple of 14 and 8 is 56, meaning the lowest
+			amount we could comfortably extract in parallel is 56 / 14 = 4 elements.
+
+			This means our parallel strategy could also be effective with 128-bit vectors,
+			but as we're targetting AVX2, we can double all of the numbers to process
+			not 7 bytes at a time, but 14.
+		*/
+		while (u < (n / 8)) {
+			/* 
+				We know that an element could never be in more than 3 bytes at a time.
+				The worst case is that the first bit is at index 7 of byte 0,
+				the takes up the entire byte 1, and the last few bits are in byte 2.
+
+				We can effectively work around this by performing fast 32-bit loads,
+				and simply reading an extra byte each time. The loads are indifferent
+				to which byte is the unused one, and we trivially make up for it with
+				the shifts later on.
+
+				We perform 4 movs to load words at buf, buf + 3, buf + 7, buf + 10.
+				Each pair of elements has the same offset, since the first element
+				will not use the 4th byte but the second element will.
+
+				The vector will contain 8 compressed elements (end-exclusive ranges):
+				1. 00..14 (bytes 0, 1)
+				2. 14..28 (bytes 1, 2, 3)
+				3. 28..42 (bytes 3, 4, 5)
+				4. 42..56 (bytes 5, 6)
+				...
+			*/
+			__m256i compressed = _mm256_setr_epi32(
+				load4(buf + 0),
+				load4(buf + 0),
+				load4(buf + 3),
+				load4(buf + 3),
+				load4(buf + 7),
+				load4(buf + 7),
+				load4(buf + 10),
+				load4(buf + 10)
+			);
+
+			/* 
+				We first perform the byteswap, which can be trivially done as a single vpshufb.
+				This shuffle will byteswap each of the 32-bit elements within the vector.
+			*/
+			__m256i swapped = _mm256_shuffle_epi8(compressed, bytemask);
+			/* 
+				We perform shifts that align each of the elements, whereever they are within
+				their byte-swapped 32-bit representation, to start at the first bit of the element.
+				This makes up for the overlapping bytes that occur when having bit-packed elements. 
+			*/
+			__m256i shifted = _mm256_srlv_epi32(swapped, offsets);
+			/* After aligning the elements, we simply mask them off to 14-bits */
+			__m256i masked = _mm256_and_si256(shifted, mask);
+			
+			/* 
+				Here we perform a little trick, which is equivalent to reduce(.or, masked >= Q) 
+			   	If any of our elements is greater-than-or-equal to Q, the predicate is true
+			   	and we exist the decoding process.
+			*/
+			__m256i max = _mm256_max_epu32(masked, Q);
+			__m256i cmp = _mm256_cmpeq_epi32(masked, max);
+			if (!_mm256_testz_si256(cmp, cmp)) return 0;
+			
+			/* 
+				Our final step is to pack the extracted elements from being in 32-bits 
+				(but masked off to 14), into actual 16-bit elements as the API uses. 
+			*/
+			__m256i packed = _mm256_packus_epi32(masked, masked);
+			__m256i perm = _mm256_permute4x64_epi64(packed, 0xD8);
+			_mm_storeu_si128((__m128i*)out, _mm256_castsi256_si128(perm));
+			
+			u += 1;
+			buf += 14;
+			out += 8;
+		}
+		return in_len;
+	}
+#endif // yyyAVX2-
 	acc = 0;
 	acc_len = 0;
-	u = 0;
 	while (u < n) {
 		acc = (acc << 8) | (*buf ++);
 		acc_len += 8;
